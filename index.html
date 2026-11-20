@@ -384,7 +384,7 @@ dialog.sheet::backdrop{background:rgba(46,42,36,.38)}
         </div>
       </div>
       <div class="card">
-        <div class="toolbar"><h2>Journal Bluetooth</h2><button class="btn small" id="btnCopyLog">Copier</button></div>
+        <div class="toolbar"><h2>Journal Bluetooth</h2><div style="display:flex;gap:var(--space-3)"><button class="btn small" id="btnShareLog">Partager</button><button class="btn small" id="btnCopyLog">Copier</button></div></div>
         <p class="prose">Trames envoyées (marron) et reçues (vert). Si une valeur ne colle pas avec l'écran du tapis, copie ce journal : il suffit pour corriger le décodage.</p>
         <pre class="log" id="log"></pre>
       </div>
@@ -404,6 +404,11 @@ dialog.sheet::backdrop{background:rgba(46,42,36,.38)}
       <svg class="chart" id="sumInc" viewBox="0 0 600 56" preserveAspectRatio="none" role="img" aria-label="Courbe d'inclinaison de la séance" style="height:56px"></svg>
     </div>
     <details class="sum-more"><summary>Plus de détails</summary><div class="ds-cells" id="sumMore"></div></details>
+    <details class="sum-more" id="sumLogBox"><summary>Journal Bluetooth de la séance</summary>
+      <p class="prose" style="margin:6px 0">À envoyer à Claude si quelque chose cloche : « Partager » ouvre le partage du téléphone, choisis Claude.</p>
+      <div style="display:flex;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3)"><button type="button" class="btn" id="sumShareLog">Partager le journal</button><button type="button" class="btn" id="sumCopyLog">Copier</button></div>
+      <pre class="log" id="sumLog" style="height:220px"></pre>
+    </details>
     <button type="button" class="btn primary" id="sumClose">Fermer le bilan</button>
   </div>
 </dialog>
@@ -459,12 +464,21 @@ const S = {
 let driver = null, session = null, prog = null;
 
 /* ---------- Journal ---------- */
-const logLines = [];
+// Journal : gardé dans le navigateur (800 dernières lignes) pour survivre à un rechargement de la page
+const logLines = (() => { const old = store.get('log', []); return Array.isArray(old) && old.length ? [...old.slice(-700), { kind: '', ts: Date.now(), text: '──── page rechargée ────' }] : []; })();
+let logSaveT = null;
 function log(kind, msg){
-  const d = new Date(), t = d.toLocaleTimeString('fr-FR') + '.' + String(d.getMilliseconds()).padStart(3, '0');
-  logLines.push({ kind, text: t + '  ' + (kind === 'tx' ? '→ ' : kind === 'rx' ? '← ' : '') + msg });
-  if (logLines.length > 300) logLines.shift();
+  const d = new Date(), t = d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('fr-FR') + '.' + String(d.getMilliseconds()).padStart(3, '0');
+  logLines.push({ kind, ts: d.getTime(), text: t + '  ' + (kind === 'tx' ? '→ ' : kind === 'rx' ? '← ' : '') + msg });
+  if (logLines.length > 800) logLines.shift();
+  clearTimeout(logSaveT); logSaveT = setTimeout(() => store.set('log', logLines), 800);
   renderLog();
+}
+const logText = lines => lines.map(l => l.text || l).join('\n');
+// Partage (feuille de partage Android : Claude, mail…), sinon copie
+async function shareText(title, text, btn){
+  if (navigator.share){ try { await navigator.share({ title, text }); return; } catch(e){ if (e.name === 'AbortError') return; } }
+  copy(text, btn);
 }
 function renderLog(){
   const el = $('#log'); if (!el || $('#tab-reglages').hidden) return;
@@ -821,7 +835,11 @@ function finishSession(){
       steps: S.m.steps || null, hrAvg: st.hrAvg, hrMax: st.hrMax, source: S.mode,
       samples: session.samples.filter((_, i) => i % 10 === 0) };
     s.avgSpeed = el ? s.distance / (el / 3600) : 0;
-    const h = store.get('sessions', []); h.unshift(s); store.set('sessions', h.slice(0, 200));
+    const diagLines = logLines.filter(l => /Diag ·/.test(l.text)).slice(-6);
+    s.log = [...diagLines, ...logLines.filter(l => l.ts >= session.start - 30000 && !diagLines.includes(l))].slice(-400).map(l => l.text);
+    const h = store.get('sessions', []); h.unshift(s);
+    h.forEach((x, k) => { if (k >= 5) delete x.log; });
+    store.set('sessions', h.slice(0, 200));
     log('', 'Séance enregistrée : ' + hms(el) + ', ' + fr2(s.distance) + ' km');
     showSummary(s, true);
   }
@@ -879,9 +897,16 @@ function showSummary(s, justEnded){
   $('#sumSpeed').innerHTML = lineSVG(s.samples, 1, 84);
   $('#sumInc').innerHTML = lineSVG(s.samples, 2, 56);
   $('#sumCharts').hidden = !(s.samples && s.samples.length > 1);
+  const lines = s.log || [];
+  $('#sumLogBox').hidden = !lines.length;
+  $('#sumLog').textContent = lines.join('\n');
+  sumLogText = 'Journal Foulée, séance du ' + d0.toLocaleDateString('fr-FR') + ' ' + t(d0) + '\n' + lines.join('\n');
   const dlg = $('#summary');
   if (!dlg.open){ try { dlg.showModal(); } catch(e){ dlg.setAttribute('open', ''); } }
 }
+let sumLogText = '';
+$('#sumShareLog').addEventListener('click', e => shareText('Journal Foulée', sumLogText, e.currentTarget));
+$('#sumCopyLog').addEventListener('click', e => copy(sumLogText, e.currentTarget));
 $('#sumClose').addEventListener('click', () => { const dlg = $('#summary'); try { dlg.close(); } catch(e){ dlg.removeAttribute('open'); } });
 
 /* ---------- Commandes ---------- */
@@ -1351,7 +1376,8 @@ $('#histList').addEventListener('click', e => {
 $('#btnClearEx').addEventListener('click', () => { store.set('sessions', store.get('sessions', []).filter(s => !s.example)); renderHistory(); });
 async function copy(text, btn){ const o = btn.textContent; try { await navigator.clipboard.writeText(text); btn.textContent = 'Copié'; } catch(e){ btn.textContent = 'Copie refusée'; } setTimeout(() => btn.textContent = o, 1600); }
 $('#btnCopyHist').addEventListener('click', e => copy(JSON.stringify(store.get('sessions', []), null, 1), e.currentTarget));
-$('#btnCopyLog').addEventListener('click', e => copy(logLines.map(l => l.text).join('\n'), e.currentTarget));
+$('#btnCopyLog').addEventListener('click', e => copy(logText(logLines), e.currentTarget));
+$('#btnShareLog').addEventListener('click', e => shareText('Journal Foulée', 'Journal Foulée\n' + logText(logLines), e.currentTarget));
 $('#setWeight').value = settings.weight; $('#setKcal').value = settings.kcal; $('#setStartSpeed').value = settings.startSpeed; $('#setScan').value = settings.scan;
 $('#setAuto').value = settings.autoConnect === false ? 'off' : 'on';
 $('#setAuto').addEventListener('change', e => { settings.autoConnect = e.target.value === 'on'; saveSettings(); log('', 'Connexion à l\'ouverture : ' + (settings.autoConnect ? 'automatique' : 'manuelle')); });
