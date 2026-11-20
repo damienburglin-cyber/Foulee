@@ -1015,9 +1015,19 @@ const ADDED = [
   { id: 'p5', name: 'Coteaux 15 min', segments: [
     {d:120,s:3,i:0},{d:90,s:3.5,i:1},{d:90,s:3.5,i:2},{d:90,s:4,i:2},{d:90,s:3.5,i:3},
     {d:90,s:4,i:0},{d:90,s:4,i:3},{d:90,s:3.5,i:1},{d:150,s:3,i:0}] },
-  { id: 'p6', name: 'Décrassage 12 min', segments: [
-    {d:120,s:2,i:0},{d:120,s:2.3,i:0},{d:180,s:2.6,i:0},{d:120,s:3,i:0},{d:90,s:2.5,i:0},{d:90,s:2,i:0}] }
+  { id: 'p6', name: 'Décrassage 15 min', segments: [
+    {d:150,s:2,i:0},{d:150,s:2.3,i:0},{d:240,s:2.6,i:0},{d:150,s:3,i:0},{d:120,s:2.5,i:0},{d:90,s:2,i:0}] }
 ];
+// Programmes ajoutés puis revus : remplacés seulement s'ils n'ont pas été modifiés à la main
+const REVISED = [
+  { id: 'p6', old: { name: 'Décrassage 12 min', segments: [{d:120,s:2,i:0},{d:120,s:2.3,i:0},{d:180,s:2.6,i:0},{d:120,s:3,i:0},{d:90,s:2.5,i:0},{d:90,s:2,i:0}] } }
+];
+REVISED.forEach(r => {
+  const k = programs.findIndex(x => x.id === r.id), nu = ADDED.find(x => x.id === r.id);
+  if (k < 0 || !nu) return;
+  const cur = programs[k];
+  if (cur.name === r.old.name && JSON.stringify(cur.segments) === JSON.stringify(r.old.segments)){ programs[k] = JSON.parse(JSON.stringify(nu)); saveProgs(); }
+});
 ADDED.forEach(p => {
   if (store.get('added.' + p.id, false)) return;
   if (!programs.some(x => x.id === p.id)) { programs.push(p); saveProgs(); }
