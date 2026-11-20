@@ -458,7 +458,7 @@ let driver = null, session = null, prog = null;
 /* ---------- Journal ---------- */
 const logLines = [];
 function log(kind, msg){
-  const t = new Date().toLocaleTimeString('fr-FR');
+  const d = new Date(), t = d.toLocaleTimeString('fr-FR') + '.' + String(d.getMilliseconds()).padStart(3, '0');
   logLines.push({ kind, text: t + '  ' + (kind === 'tx' ? '→ ' : kind === 'rx' ? '← ' : '') + msg });
   if (logLines.length > 300) logLines.shift();
   renderLog();
@@ -496,16 +496,34 @@ function FitShowDriver(server, svc, wr, nt){
     while (queue.length && alive){
       const f = queue.shift();
       try { if (canNoResp) await wr.writeValueWithoutResponse(f); else await wr.writeValueWithResponse(f);
-        if (f[1] !== 0x51) log('tx', hex(f)); }
+        if (f[1] !== 0x51) log('tx', txLabel(f) + '  [' + hex(f) + ']'); }
       catch(e){ log('err', 'Écriture refusée : ' + e.message); }
       await sleep(110);
     }
     busy = false;
   }
   const send = p => { queue.push(frame(p)); pump(); };
+  const txLabel = f => {
+    const c = f[1], q = f[2];
+    if (c === 0x53) return q === 1 ? 'Commande : démarrer' : q === 2 ? 'Commande : consigne ' + fr1(f[3] / 10) + ' km/h, ' + (f[4] << 24 >> 24) + ' %' : q === 3 ? 'Commande : stop' : q === 6 ? 'Commande : pause' : 'Commande 53 ' + q;
+    if (c === 0x50) return 'Lecture des infos du tapis (' + q + ')';
+    return 'Trame';
+  };
+  const PAR = { 0: 'veille', 1: 'arrêt', 2: 'compte à rebours', 3: 'en marche', 4: 'ralentit', 5: 'erreur', 6: 'clé absente', 7: 'arrêt (7)', 10: 'pause' };
+  let lastState = '', shortWarned = false;
   function onFrame(f){
     const cmd = f[1], par = f[2];
-    if (cmd !== 0x51) log('rx', hex(f));
+    if (cmd !== 0x51) log('rx', (cmd === 0x53 ? 'Réponse du tapis à la commande ' + par : 'Réponse ' + cmd.toString(16)) + '  [' + hex(f) + ']');
+    if (cmd === 0x51){
+      // Une ligne à chaque changement d'état, de vitesse ou de pente reçu (pas à chaque interrogation)
+      const key = par + '|' + f.length + '|' + (f.length > 6 ? f[3] + '|' + f[4] : f[3]);
+      if (key !== lastState){
+        lastState = key;
+        const sp = f.length > 6 ? fr1(f[3] / 10) + ' km/h' : '-', inc = f.length > 6 ? (f[4] << 24 >> 24) + ' %' : '-';
+        log('rx', 'État reçu : ' + (PAR[par] || 'code ' + par) + (par === 2 ? ' (' + f[3] + ')' : ' · vitesse ' + sp + ' · pente ' + inc) + ' · ' + f.length + ' octets  [' + hex(f) + ']');
+        if ((par === 3 || par === 10) && f.length < 16 && !shortWarned){ shortWarned = true; log('err', 'Trames d\'état courtes (' + f.length + ' octets) : seules la vitesse et la pente sont lues'); }
+      }
+    }
     if (cmd === 0x50){
       if (par === 0x02 && f.length >= 7){ S.limits.maxS = f[3] / 10; S.limits.minS = f[4] / 10; S.info['Vitesse'] = fr1(S.limits.minS) + ' à ' + fr1(S.limits.maxS) + ' km/h'; }
       if (par === 0x03 && f.length >= 7){ S.limits.maxI = (f[3] << 24 >> 24); S.limits.minI = (f[4] << 24 >> 24); S.info['Inclinaison'] = S.limits.minI + ' à ' + S.limits.maxI + ' %'; }
@@ -518,9 +536,11 @@ function FitShowDriver(server, svc, wr, nt){
       if (par === 2 && f.length > 4) S.countdown = f[3];
       if (par === 5) S.errorMsg = 'Erreur tapis E' + (f[3] ?? '?');
       if (par === 6) S.errorMsg = 'Clé de sécurité absente';
-      if ((par === 3 || par === 10 || par === 4 || par === 1) && f.length >= 16){
+      if ((par === 3 || par === 10 || par === 4 || par === 1) && f.length >= 7){
         S.speed = par === 3 ? f[3] / 10 : 0;
         S.incline = f[4] << 24 >> 24;
+      }
+      if ((par === 3 || par === 10 || par === 4 || par === 1) && f.length >= 16){
         S.m.elapsed = f[5] | f[6] << 8;
         S.m.kcal = f[9] | f[10] << 8;
         S.m.steps = f[11] | f[12] << 8;
@@ -563,6 +583,7 @@ function FitShowDriver(server, svc, wr, nt){
 
 /* ---------- Pilote FTMS (service 0x1826, standard Bluetooth) ---------- */
 function FTMSDriver(server, svc, data, cp, st){
+  let lastFtms = '';
   const write = async (arr, label) => { try { await cp.writeValueWithResponse(new Uint8Array(arr)); log('tx', label + '  ' + hex(arr)); } catch(e){ log('err', label + ' refusé : ' + e.message); } };
   data.addEventListener('characteristicvaluechanged', e => {
     const dv = e.target.value, f = dv.getUint16(0, true); let i = 2;
@@ -579,6 +600,8 @@ function FTMSDriver(server, svc, data, cp, st){
       if (f & 512) i += 1;
       if (f & 1024){ S.m.elapsed = dv.getUint16(i, true); i += 2; }
     } catch(err){}
+    const k = fr1(S.speed) + '|' + S.incline;
+    if (k !== lastFtms){ lastFtms = k; log('rx', 'Mesure reçue : vitesse ' + fr1(S.speed) + ' km/h · pente ' + S.incline + ' %'); }
     if (S.speed > 0 && (S.status === 'idle' || S.status === 'starting')) setStatus('running');
     render();
   });
@@ -732,6 +755,7 @@ function toast(msg, undo){
 function resetCounters(){ S.m = { elapsed: null, distance: null, kcal: null, hr: null, steps: null }; S.loc = { elapsed: 0, distance: 0, kcal: 0 }; }
 function setStatus(st){
   const prev = S.status; if (st === prev) return; S.status = st;
+  log('', 'Statut appli : ' + (LABEL[prev] || prev) + ' → ' + (LABEL[st] || st) + ' · consigne ' + fr1(S.targetSpeed) + ' km/h, ' + S.targetIncline + ' %' + (prog ? ' · programme « ' + prog.p.name + ' », étape ' + (prog.seg + 1) : ''));
   if (st !== 'error') S.errorMsg = '';
   if (st === 'starting' && !boot) startBoot();
   if (st === 'running' && prev !== 'paused'){
