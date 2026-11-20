@@ -1,0 +1,1307 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Foulée</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+/* Design system « Route des Vins à pied » (thème ivoire). Tokens repris de tokens.json, sans modification.
+   Deux tokens proposés en plus, pour un usage en mouvement : --display-number (vitesse lue en marchant) et --tap-run (commandes touchées en marchant). */
+:root{
+  /* Couleurs */
+  --bg:#f2ede3; --panel:#f7f2e8; --panel2:#efe8da; --card:#fffdf9; --card2:#fffbf4; --track:#e9e1d2; --edge:#e4dbcb;
+  --ink:#2e2a24; --muted:#6b6153;
+  --gold:#b8914a; --gold-d:#7a5c25; --gold2:#d9bc82;
+  --green:#6f9460; --green-d:#4f7342; --wine:#8e3b46; --wine-d:#6e2c35; --sky:#5e86a8; --sky-d:#466a8a;
+  --good:#3f6b35; --bad:#a3324a; --ok-bg:#e2ecdb; --ok-ink:#3f5e34; --todo-bg:#f3e2bd; --todo-ink:#5e4520; --on-gold:#2b200c;
+  --data-line:#4f8f7e; --sage-100:#f0f6eb; --sage-200:#d2e2c6; --sage-900:#2f4a22;
+  --field:#fffdf8; --placeholder:#8c8273; --toast-ink:#3b2a10; --tooltip:var(--ink);
+  /* Typo */
+  --font-display:Lora,"Iowan Old Style",Georgia,"Noto Serif",serif;
+  --font-body:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  /* Espacements, rayons, ombres, tailles, courbes */
+  --space-1:4px; --space-2:6px; --space-3:8px; --space-4:12px; --space-5:14px; --space-6:20px;
+  --radius-s:10px; --radius-m:12px; --radius-l:18px; --radius-xl:22px; --radius-pill:999px;
+  --shadow-relief:6px 6px 14px #ddd4c4, -6px -6px 14px #ffffff;
+  --shadow-card:0 0 0 1px rgba(120,92,45,.14), 0 1px 2px rgba(70,50,20,.08), 0 4px 12px rgba(70,50,20,.09);
+  --shadow-inset:inset 0 0 0 1px rgba(120,92,45,.15), inset 0 2px 5px rgba(70,50,20,.07);
+  --tap-min:44px; --tap-main:48px;
+  --ease-bounce:cubic-bezier(.34,1.3,.5,1); --ease-out:cubic-bezier(.2,.8,.2,1);
+  /* Proposés au DS */
+  --display-number:72px; --tap-run:64px;
+  /* Alias de l'ancienne feuille : ils pointent tous vers des tokens du DS */
+  --sunk:var(--panel2); --line:var(--edge); --gold-a:var(--gold2); --gold-b:var(--gold); --gold-ink:var(--gold-d);
+  --brown:var(--green-d); --brown-ink:#ffffff;
+  --sage:var(--green); --sage-a:var(--green); --sage-soft:var(--ok-bg); --sage-ink:var(--ok-ink);
+  --accent:var(--data-line); --incline:var(--gold);
+  --bad-soft:#f4e3e3; --warn:var(--todo-ink); --warn-soft:var(--todo-bg);
+  --shadow:var(--shadow-card);
+  --f-display:var(--font-display); --f-body:var(--font-body); --f-mono:var(--font-body);
+  --r:var(--radius-xl); color-scheme:light;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45;margin:0}
+.wrap{max-width:1080px;margin:0 auto;padding-inline:var(--space-4);padding-block:var(--space-5) calc(112px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:var(--space-6)}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;margin:0;text-wrap:balance;color:var(--ink)}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--gold-d);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+.label{font-size:12px;line-height:1.3;color:var(--muted);font-weight:700}
+code{font-family:var(--f-mono);font-size:.9em;background:var(--sunk);padding:1px 5px;border-radius:5px}
+
+/* En-tête */
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;justify-content:space-between}
+.brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px;width:100%}
+.brand h1{font-size:26px;line-height:1.1}
+.brand small{color:var(--muted);font-size:13px}
+.conn{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-3);width:100%;background:var(--panel);border-radius:var(--radius-xl);padding:var(--space-4) var(--space-5);box-shadow:var(--shadow-relief)}
+.conn .grow{flex:1 1 50%;min-width:0}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:var(--radius-pill);font-size:12px;line-height:1.4;font-weight:700;background:var(--panel2);color:var(--muted)}
+.chip::before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor}
+.chip.ok{background:var(--sage-soft);color:var(--sage-ink)}
+.chip.warn{background:var(--todo-bg);color:var(--todo-ink)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+/* Button (DS) : .btn = ds-mini, .btn.primary = ds-btn--primary, .btn.sky = ds-mini--sky, .btn.ghost = ds-link */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:var(--tap-min);min-width:var(--tap-min);padding:8px 14px;border:none;border-radius:var(--radius-m);background:var(--card);color:var(--ink);box-shadow:var(--shadow-card);font:700 15px/1.2 var(--font-body);text-align:center}
+.btn:active{box-shadow:var(--shadow-inset)}
+.btn.primary{min-height:var(--tap-main);padding:10px 18px;background:var(--green-d);color:#ffffff;box-shadow:0 5px 12px rgba(79,115,66,.25)}
+.btn.sky{background:var(--sky-d);color:#ffffff}
+.btn.ghost{background:transparent;box-shadow:none;padding:0 4px;color:var(--gold-d);text-decoration:underline;text-underline-offset:3px}
+.btn.small{font-size:14px;padding:8px 12px}
+.btn.primary.small{min-height:var(--tap-min)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.notice{background:rgba(142,59,70,.08);color:var(--ink);border-radius:var(--radius-m);padding:10px 12px;font-size:14px}
+.notice b{color:var(--ink)}
+.notice.err b{color:var(--bad)}
+
+/* TabBar (DS, copiée de components/bundle.css) dans un dock fixe : 12 px des bords, 10 px du bas */
+.navdock{position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:10;max-width:560px;margin:0 auto}
+@property --nx{syntax:'<length>';inherits:true;initial-value:40px}
+.ds-tabbar{position:relative;display:flex;justify-content:space-between;gap:2px;padding:8px 6px 6px;margin-top:34px;filter:drop-shadow(0 8px 14px rgba(70,50,20,.14)) drop-shadow(0 1px 2px rgba(70,50,20,.12));transition:--nx .75s var(--ease-bounce)}
+.ds-tabbar::after{content:"";position:absolute;inset:0;z-index:0;border-radius:26px;background:var(--card);-webkit-mask:radial-gradient(circle 33px at var(--nx) -4px,transparent 32px,#000 33.5px);mask:radial-gradient(circle 33px at var(--nx) -4px,transparent 32px,#000 33.5px)}
+.ds-tabbar button{all:unset;position:relative;z-index:2;min-height:54px;min-width:48px;flex:1 1 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border-radius:18px;color:var(--muted);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.ds-tabbar button svg{width:23px;height:23px;transition:transform .7s var(--ease-bounce)}
+.ds-tabbar button[aria-current="page"]{color:var(--sage-900)}
+.ds-tabbar button[aria-current="page"] svg{transform:translateY(-27px)}
+.ds-tabbar .tl{display:block;height:0;overflow:hidden;opacity:0;font:800 10.5px var(--font-body);letter-spacing:.14em;text-transform:uppercase;transition:opacity .5s .2s}
+.ds-tabbar button[aria-current="page"] .tl{height:auto;opacity:1;position:absolute;bottom:6px}
+.ds-tabbar button:focus-visible{outline:3px solid var(--gold);outline-offset:-3px}
+.ds-tabbar .pill{position:absolute;z-index:1;top:-31px;left:0;width:54px;height:54px;border-radius:50%;background:radial-gradient(circle at 35% 30%,var(--sage-100),var(--sage-200) 70%);box-shadow:0 6px 12px rgba(79,115,66,.30),inset 0 1px 0 rgba(255,255,255,.9),inset 0 -2px 3px rgba(79,115,66,.15);transform:translateX(calc(var(--nx) - 27px));transition:transform .75s var(--ease-bounce);pointer-events:none}
+@media (prefers-reduced-motion:reduce){.ds-tabbar,.ds-tabbar button svg,.ds-tabbar .tl,.ds-tabbar .pill{transition:none}}
+
+/* Séance */
+.session{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);grid-template-areas:"live ctl" "stats ctl";gap:var(--space-6);align-items:start}
+.session .live{grid-area:live}.session .controls{grid-area:ctl}.session .stats{grid-area:stats}
+@media (max-width:820px){.session{grid-template-columns:minmax(0,1fr);grid-template-areas:"live" "ctl" "stats"}}
+.console,.ctl,.card,.hlist,.editor{background:var(--panel);border-radius:var(--radius-xl);box-shadow:var(--shadow-relief)}
+.pcard,.total{background:var(--card);border-radius:var(--radius-l);box-shadow:var(--shadow-card)}
+.console{padding:var(--space-5);display:flex;flex-direction:column;gap:var(--space-5)}
+.hero{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between}
+.hero h2{font-size:21px;font-weight:600}
+.hero .speed{font-family:var(--font-display);font-weight:700;font-size:var(--display-number);line-height:.95}
+.hero .unit{font-size:21px;color:var(--muted);font-weight:700}
+.hero > div:first-child{white-space:nowrap}
+.hero .side{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+@media (max-width:560px){.hero .side{align-items:flex-start}}
+.state{display:inline-flex;align-items:center;gap:var(--space-3);padding:6px 14px;border-radius:var(--radius-pill);font:700 15px/1.3 var(--font-body);background:var(--panel2);color:var(--muted)}
+.state i{width:10px;height:10px;border-radius:50%;background:currentColor}
+.state.running{background:var(--sage-soft);color:var(--sage-ink)}
+.state.paused,.state.starting{background:var(--todo-bg);color:var(--todo-ink)}
+.state.error{background:var(--bad-soft);color:var(--bad)}
+.target{color:var(--muted);font-size:13px}
+.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-2)}
+@media (max-width:560px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.metric{background:var(--card);border-radius:var(--radius-s);padding:var(--space-3) var(--space-4);display:flex;flex-direction:column;gap:1px;min-width:0}
+.metric .v{font-family:var(--font-display);font-size:26px;font-weight:700;line-height:1.1}
+.metric .v small{font-family:var(--font-body);font-size:13px;color:var(--muted);font-weight:700;margin-left:var(--space-1)}
+.metric.inc .v{color:var(--gold-ink)}
+/* Chart (DS) : une mesure par graphique (jamais deux axes Y), courbe data-line 2 px, référence en pointillés, vue tableau */
+.ds-chart{background:var(--card);border-radius:16px;box-shadow:var(--shadow-card);padding:12px;display:grid;gap:8px}
+.ds-chart h4{margin:0;font:700 15px var(--font-body);display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.ds-chart h4 small{font-size:12px;font-weight:700;color:var(--muted)}
+.chart{width:100%;height:84px;display:block}
+#incChart{height:56px}
+.ds-note{margin:0;font-size:12px;color:var(--muted)}
+.ds-chart details summary{min-height:var(--tap-min);display:flex;align-items:center;cursor:pointer;color:var(--gold-d);font:700 14px var(--font-body)}
+.ctab{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.ctab th{text-align:left;color:var(--muted);font-weight:700;font-size:12px;padding:4px 6px}
+.ctab td{padding:4px 6px;border-top:1px solid var(--edge)}
+
+.prog-banner{background:var(--panel2);border-radius:var(--radius-m);padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-3)}
+.prog-banner .row{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
+.prog-banner h3{font-size:18px;font-weight:600}
+/* Barre d'avancement = barre d'XP du Hud (DS) : 9 px, en creux, dégradé gold2 → gold, texte dessous */
+.xp{height:9px;border-radius:var(--radius-pill);background:var(--track);box-shadow:var(--shadow-inset);position:relative}
+.xp i{display:block;width:0;height:100%;border-radius:var(--radius-pill);background:linear-gradient(90deg,var(--gold2),var(--gold));transition:width .8s var(--ease-out)}
+.prog-banner .meta{font-size:13px;color:var(--muted)}
+.prog-banner .meta.pill{background:var(--todo-bg);color:var(--todo-ink);border-radius:var(--radius-pill);padding:3px 10px;font-size:12px;font-weight:700}
+
+.controls{display:flex;flex-direction:column;gap:var(--space-6)}
+.ctl{padding:var(--space-5);display:flex;flex-direction:column;gap:var(--space-4)}
+.ctl h2{font-size:21px;font-weight:600;display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.ctl h2 .num{font-size:26px;font-weight:700}
+/* Pas à pas : ds-mini à la hauteur tap-run (commandes touchées en marchant) */
+.stepper{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-3)}
+.stepper button{min-height:var(--tap-run);border:none;border-radius:var(--radius-m);background:var(--card);box-shadow:var(--shadow-card);font:700 20px/1.2 var(--font-body);font-variant-numeric:tabular-nums;color:var(--ink)}
+.stepper button:active{box-shadow:var(--shadow-inset)}
+/* Préréglages : ds-chip (aria-pressed), sky-d quand actif */
+.presets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-2)}
+.presets button{min-height:var(--tap-min);padding:8px 6px;border:none;border-radius:var(--radius-pill);background:var(--card);color:var(--ink);box-shadow:var(--shadow-card);font:700 14px/1.2 var(--font-body);font-variant-numeric:tabular-nums;white-space:nowrap}
+.presets button small{font-size:12px;color:var(--muted);font-weight:700;margin-left:3px}
+.presets button.on{background:var(--sky-d);color:#ffffff;box-shadow:var(--shadow-inset)}
+.presets button.on small{color:#ffffff}
+/* Démarrer / Pause = ds-btn plein (primary / gold), Stop = ds-mini--wine, tous à tap-run */
+.run{display:grid;grid-template-columns:2fr 1fr;gap:var(--space-3)}
+.run button{min-height:var(--tap-run);border:none;border-radius:var(--radius-m);font:700 18px/1.2 var(--font-body)}
+.run .go{background:var(--green-d);color:#ffffff;box-shadow:0 5px 12px rgba(79,115,66,.25)}
+.run .pause{background:linear-gradient(180deg,var(--gold2),var(--gold));color:var(--on-gold);box-shadow:0 5px 12px rgba(184,145,74,.33)}
+.run .stop{background:var(--wine);color:#ffffff;box-shadow:var(--shadow-card)}
+.run button:active{box-shadow:var(--shadow-inset)}
+.run button:disabled{opacity:.45;cursor:not-allowed}
+.kbd{font-size:13px;color:var(--muted);margin:0}
+.kbd kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px;background:var(--panel)}
+@media (hover:none),(pointer:coarse){.kbd{display:none}}
+
+/* Programmes */
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.toolbar h2{font-size:21px;font-weight:600}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+.pcard{padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-4);min-width:0}
+.pcard h3{font-size:18px;font-weight:600}
+.pcard .facts{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.pcard .facts b{color:var(--ink);font-weight:600}
+.pcard .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
+.profile{width:100%;height:64px;display:block;background:var(--card2);border-radius:var(--radius-m);box-shadow:var(--shadow-inset)}
+.editor{padding:var(--space-5);display:flex;flex-direction:column;gap:var(--space-4)}
+/* Éditeur : une carte par étape (pas de scroll horizontal à 393 px) */
+.editor .field input{max-width:none}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:var(--space-3)}
+.step{background:var(--card);border-radius:var(--radius-l);box-shadow:var(--shadow-card);padding:var(--space-4);display:grid;gap:var(--space-3)}
+.step-head{display:flex;justify-content:space-between;align-items:center;gap:var(--space-3)}
+.step-n{font:600 18px/1.15 var(--font-display)}
+.step-act{display:flex;gap:var(--space-3)}
+.step-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-2)}
+.step-fields .field input{padding-right:42px}
+.iconbtn{display:inline-grid;place-items:center;min-width:var(--tap-min);min-height:var(--tap-min);padding:0 6px;border:none;border-radius:var(--radius-m);background:var(--card);color:var(--muted);box-shadow:var(--shadow-card);font:700 13px var(--font-body)}
+.iconbtn svg{width:20px;height:20px}
+.iconbtn:active{box-shadow:var(--shadow-inset)}
+.iconbtn[data-armed]{color:var(--bad)}
+
+/* Historique */
+.totals{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-4)}
+@media (max-width:640px){.totals{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.total{padding:var(--space-4)}
+.total .v{font-family:var(--font-display);font-size:26px;font-weight:700}
+.hlist{display:flex;flex-direction:column;overflow:hidden}
+.hrow{display:grid;grid-template-columns:minmax(0,1.6fr) repeat(4,minmax(0,.8fr)) 120px var(--tap-min);gap:var(--space-2);align-items:center;padding:var(--space-4) var(--space-5);border-top:1px solid var(--edge)}
+.hrow:first-child{border-top:none}
+.hrow .when b{display:block;font-family:var(--f-display);font-size:18px;font-weight:700}
+.hrow .when span{font-size:14px;color:var(--muted)}
+/* Cellules StatTile (DS) : libellé micro muted au-dessus, valeur en gras avec son unité */
+.hrow .c{background:var(--card);border-radius:var(--radius-s);padding:6px 8px;font:800 15px/1.25 var(--font-body);font-variant-numeric:tabular-nums;min-width:0;white-space:nowrap}
+.hrow .c small{display:block;font-size:12px;color:var(--muted);font-weight:700}
+.hrow .spark{width:120px;height:32px}
+.tag{display:inline-block;font-family:var(--f-body);font-size:12px;font-weight:500;background:var(--sage-soft);color:var(--sage-ink);border-radius:999px;padding:1px 9px;margin-left:8px;vertical-align:2px}
+@media (max-width:760px){.hrow{grid-template-columns:repeat(4,minmax(0,1fr))}.hrow .when{grid-column:1/4}.hrow .spark{display:none}.hrow .del{grid-row:1;grid-column:4;justify-self:end}}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+/* StatTile (DS, bundle.css) */
+.ds-cells{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-2)}
+.ds-cell{background:var(--card);border-radius:var(--radius-s);padding:6px 8px;display:grid;gap:1px;min-width:0}
+.ds-cell span{font-size:12px;font-weight:700;color:var(--muted)}
+.ds-cell b{font:800 16px/1.25 var(--font-body);color:var(--ink);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.ds-hero{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:var(--radius-m);background:var(--panel2)}
+.ds-hero b{font:700 26px/1.1 var(--font-display);white-space:nowrap}
+.ds-hero span{display:block;font-weight:800;font-size:14px}.ds-hero small{display:block;font-size:13px;line-height:1.35;color:var(--muted)}
+/* Bilan : feuille posée en bas de l'écran ; reste ouverte jusqu'à « Fermer le bilan » (ou Échap) */
+dialog.sheet{border:none;padding:0;background:transparent;color:var(--ink);width:100%;max-width:560px;margin:auto auto 0;max-height:94dvh}
+dialog.sheet::backdrop{background:rgba(46,42,36,.38)}
+.sheet-in{background:var(--panel);border-radius:var(--radius-xl) var(--radius-xl) 0 0;box-shadow:var(--shadow-relief);padding:var(--space-5) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:var(--space-4);max-height:94dvh;overflow:auto}
+.sheet-in h2{font-size:21px;font-weight:600}
+.sum-more summary{min-height:var(--tap-min);display:flex;align-items:center;cursor:pointer;color:var(--gold-d);font:700 14px var(--font-body)}
+.sum-more .ds-cells{margin-top:var(--space-2)}
+#sumClose{width:100%;min-height:var(--tap-run)}
+/* Historique : le nom de la séance ouvre son bilan */
+.hrow .when{all:unset;cursor:pointer;min-height:var(--tap-min);display:block;min-width:0}
+.hrow .when:focus-visible{outline:3px solid var(--gold-d);outline-offset:2px;border-radius:var(--radius-s)}
+.hrow .when u{color:var(--gold-d);font-weight:700;text-underline-offset:3px}
+@media (max-width:760px){.hrow .when{grid-column:1/4}}
+/* Toast (DS) : phrase au passé, 3 à 5 s, « Annuler » quand l'action se défait. Posé au-dessus de la barre d'onglets. */
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(112px + env(safe-area-inset-bottom,0px));z-index:11;display:inline-flex;align-items:center;gap:10px;max-width:calc(100% - 24px);padding:6px 16px;border-radius:var(--radius-pill);background:linear-gradient(180deg,var(--todo-bg),var(--gold2));color:var(--toast-ink);box-shadow:var(--shadow-card);font:700 14px/1.3 var(--font-body)}
+.toast span{padding:6px 0;white-space:nowrap}
+.toast button{all:unset;cursor:pointer;text-decoration:underline;text-underline-offset:3px;min-height:var(--tap-min);min-width:var(--tap-min);display:inline-flex;align-items:center;justify-content:center}
+.toast button:focus-visible{outline:3px solid var(--gold-d);outline-offset:2px}
+
+/* Réglages / journal */
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:16px;align-items:start}
+@media (max-width:820px){.cols{grid-template-columns:minmax(0,1fr)}}
+.card{padding:var(--space-5);display:flex;flex-direction:column;gap:var(--space-4);min-width:0}
+.card h2{font-size:21px;font-weight:600}
+/* Field (DS) : libellé au-dessus, champ en creux, unité à droite, aide dessous */
+.field{display:flex;flex-direction:column;gap:var(--space-1);min-width:0}
+.field .label{font-size:13px;color:var(--ink)}
+.field input,.field select{box-sizing:border-box;min-height:var(--tap-min);width:100%;max-width:280px;padding:8px 12px;border:1px solid var(--edge);border-radius:var(--radius-m);background:var(--field);box-shadow:var(--shadow-inset);font:400 16px var(--font-body);color:var(--ink);font-variant-numeric:tabular-nums}
+.field select{min-height:46px}
+.field input:focus-visible,.field select:focus-visible{outline:3px solid var(--gold-d);outline-offset:1px}
+.field .hint{font-size:13px;color:var(--muted)}
+.inunit{position:relative;display:block}
+.inunit em{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-style:normal;font-weight:700;font-size:13px;color:var(--muted);pointer-events:none}
+.log{font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:12px;background:var(--card2);box-shadow:var(--shadow-inset);border-radius:var(--radius-m);padding:12px;height:340px;overflow:auto;white-space:pre-wrap;word-break:break-all;margin:0}
+.log .tx{color:var(--brown)} .log .rx{color:var(--sage-ink)} .log .er{color:var(--bad)}
+.dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:15px;margin:0}
+.dl dt{color:var(--muted)} .dl dd{margin:0;font-variant-numeric:tabular-nums}
+.prose{font-size:13px;color:var(--muted);max-width:65ch;margin:0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><h1>Foulée</h1><small id="today">Aujourd'hui</small></div>
+    <div class="conn">
+      <span class="chip" id="connChip">Déconnecté</span>
+      <span class="grow label" id="devName">FOUSAE FS-8BE095</span>
+      <button class="btn sky" id="btnConnect">Connecter le tapis</button>
+      <button class="btn ghost" id="btnDemo">Mode démo</button>
+    </div>
+  </header>
+
+  <div id="notice" hidden></div>
+
+
+  <!-- SÉANCE -->
+  <section id="tab-seance" class="session">
+    <div class="console live">
+      <div class="prog-banner" id="progBanner" hidden>
+        <div class="row"><h3 id="pbName">Programme</h3><span class="meta pill num" id="pbMeta"></span></div>
+        <div class="xp" id="pbXp" role="progressbar" aria-label="Avancement du programme" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="pbBar"></i></div>
+        <svg class="profile" id="pbProfile" viewBox="0 0 600 64" preserveAspectRatio="none"></svg>
+        <div class="row"><span class="meta" id="pbNext"></span><button class="btn small ghost" id="pbQuit">Quitter le programme</button></div>
+      </div>
+      <div class="hero">
+        <div><h2>Vitesse</h2><span class="speed num" id="vSpeed">0,0</span> <span class="unit">km/h</span></div>
+        <div class="side">
+          <span class="state" id="vState"><i></i><span>À l'arrêt</span></span>
+          <span class="target num" id="vTarget"></span>
+        </div>
+      </div>
+      <div class="run">
+        <button class="go" id="btnStart">Démarrer</button>
+        <button class="stop" id="btnStop">Stop</button>
+      </div>
+    </div>
+    <div class="console stats">
+      <div class="metrics">
+        <div class="metric"><span class="label">Temps</span><span class="v num" id="vTime">00:00</span></div>
+        <div class="metric"><span class="label">Distance</span><span class="v num" id="vDist">0,00<small>km</small></span></div>
+        <div class="metric inc"><span class="label">Inclinaison</span><span class="v num" id="vInc">0<small>%</small></span></div>
+        <div class="metric"><span class="label">Calories</span><span class="v num" id="vKcal">0<small>kcal</small></span></div>
+        <div class="metric"><span class="label">Allure</span><span class="v num" id="vPace">–<small>/km</small></span></div>
+        <div class="metric"><span class="label">Vitesse moy.</span><span class="v num" id="vAvg">0,0<small>km/h</small></span></div>
+        <div class="metric" id="mSteps" hidden><span class="label">Pas</span><span class="v num" id="vSteps">–</span></div>
+        <div class="metric" id="mHr" hidden><span class="label">Cardio</span><span class="v num" id="vHr">–<small>bpm</small></span></div>
+      </div>
+      <div class="ds-chart">
+        <h4>Vitesse <small>km/h · pointillés : consigne</small></h4>
+        <svg class="chart" id="liveChart" viewBox="0 0 600 84" preserveAspectRatio="none" role="img" aria-label="Courbe de vitesse de la séance"></svg>
+        <h4>Inclinaison <small>%</small></h4>
+        <svg class="chart" id="incChart" viewBox="0 0 600 56" preserveAspectRatio="none" role="img" aria-label="Courbe d'inclinaison de la séance"></svg>
+        <p class="ds-note" id="chartEmpty">Les courbes s'affichent quand le tapis tourne.</p>
+        <details id="chartTable"><summary>Voir les valeurs minute par minute</summary><div id="chartRows"></div></details>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="ctl">
+        <h2>Vitesse <span class="num" id="cSpeed">–</span></h2>
+        <div class="stepper">
+          <button data-ds="-1">−1</button><button data-ds="-0.1">−0,1</button>
+          <button data-ds="0.1">+0,1</button><button data-ds="1">+1</button>
+        </div>
+        <div class="presets" id="speedPresets"></div>
+      </div>
+      <div class="ctl">
+        <h2>Inclinaison <span class="num" id="cInc">–</span></h2>
+        <div class="stepper">
+          <button data-di="-2">−2</button><button data-di="-1">−1</button>
+          <button data-di="1">+1</button><button data-di="2">+2</button>
+        </div>
+        <div class="presets" id="incPresets"></div>
+      </div>
+      <p class="kbd">Clavier : <kbd>Espace</kbd> démarrer / pause · <kbd>↑</kbd><kbd>↓</kbd> vitesse ±0,5 · <kbd>←</kbd><kbd>→</kbd> inclinaison ±1</p>
+    </div>
+  </section>
+
+  <!-- PROGRAMMES -->
+  <section id="tab-programmes" hidden>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="toolbar"><h2>Mes programmes</h2><button class="btn primary" id="btnNewProg">Nouveau programme</button></div>
+      <div id="editor" hidden></div>
+      <div class="grid-cards" id="progList"></div>
+    </div>
+  </section>
+
+  <!-- HISTORIQUE -->
+  <section id="tab-historique" hidden>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="totals" id="totals"></div>
+      <div class="toolbar"><h2>Dernières séances</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small" id="btnCopyHist">Copier en JSON</button><button class="btn small ghost" id="btnClearEx" hidden>Retirer les exemples</button></div></div>
+      <div class="hlist" id="histList"></div>
+    </div>
+  </section>
+
+  <!-- RÉGLAGES -->
+  <section id="tab-reglages" hidden>
+    <div class="cols">
+      <div class="card">
+        <h2>Réglages</h2>
+        <div class="field"><label class="label" for="setWeight">Poids (kg)</label><input id="setWeight" type="number" min="30" max="200" step="1"><span class="hint">Sert à estimer les calories quand le tapis ne les donne pas.</span></div>
+        <div class="field"><label class="label" for="setKcal">Calories affichées</label>
+          <select id="setKcal">
+            <option value="machine10">Tapis (valeur ÷ 10)</option>
+            <option value="machine">Tapis (valeur brute)</option>
+            <option value="estimate">Estimation (poids, vitesse, pente)</option>
+          </select>
+          <span class="hint">Les tapis FitShow ne documentent pas l'unité. Compare avec l'écran du tapis et garde le réglage qui colle.</span></div>
+        <div class="field"><label class="label" for="setStartSpeed">Vitesse de départ (km/h)</label><input id="setStartSpeed" type="number" min="0.5" max="20" step="0.1"></div>
+        <div class="field"><label class="label" for="setScan">Recherche du tapis</label>
+          <select id="setScan"><option value="filtered">Tapis FitShow et FTMS seulement</option><option value="all">Tous les appareils Bluetooth</option></select>
+          <span class="hint">Si le tapis n'apparaît pas, passe sur « Tous les appareils » et cherche son nom dans la liste.</span></div>
+        <h2 style="margin-top:6px">Tapis</h2>
+        <dl class="dl" id="devInfo"></dl>
+        <div id="btSection" style="display:flex;flex-direction:column;gap:var(--space-4)">
+          <h2 style="margin-top:6px">Utiliser le Bluetooth</h2>
+          <p class="prose">claude.ai bloque le Bluetooth. Ouvre Foulée à son adresse fixe dans Chrome, toujours à jour : <a href="https://damienburglin-cyber.github.io/foulee/" target="_blank" rel="noopener" style="color:var(--gold-d);font-weight:700">damienburglin-cyber.github.io/foulee/</a>. Dans Chrome, « Ajouter à l'écran d'accueil » en fait une appli.</p>
+          <button class="btn" id="btnDownload">Télécharger Foulée en fichier</button>
+        </div>
+        <h2 style="margin-top:6px">Mes données</h2>
+        <p class="prose">Séances, programmes et réglages restent dans ce navigateur, à cette adresse. Pour les passer ailleurs : exporte ici, importe là-bas. L'import ajoute ce qui manque sans rien effacer.</p>
+        <div style="display:flex;gap:var(--space-3);flex-wrap:wrap">
+          <button class="btn" id="btnExport">Exporter mes données</button>
+          <label class="btn" for="fileImport" tabindex="0" id="lblImport">Importer un fichier</label>
+          <input type="file" id="fileImport" accept=".json,application/json" hidden>
+        </div>
+      </div>
+      <div class="card">
+        <div class="toolbar"><h2>Journal Bluetooth</h2><button class="btn small" id="btnCopyLog">Copier</button></div>
+        <p class="prose">Trames envoyées (marron) et reçues (vert). Si une valeur ne colle pas avec l'écran du tapis, copie ce journal : il suffit pour corriger le décodage.</p>
+        <pre class="log" id="log"></pre>
+      </div>
+    </div>
+  </section>
+</div>
+
+<dialog id="summary" class="sheet" aria-labelledby="sumTitle">
+  <div class="sheet-in">
+    <div><h2 id="sumTitle">Séance terminée</h2><p class="prose" id="sumWhen"></p></div>
+    <div class="ds-hero" id="sumHero"></div>
+    <div class="ds-cells" id="sumCells"></div>
+    <div class="ds-chart" id="sumCharts">
+      <h4>Vitesse <small>km/h</small></h4>
+      <svg class="chart" id="sumSpeed" viewBox="0 0 600 84" preserveAspectRatio="none" role="img" aria-label="Courbe de vitesse de la séance"></svg>
+      <h4>Inclinaison <small>%</small></h4>
+      <svg class="chart" id="sumInc" viewBox="0 0 600 56" preserveAspectRatio="none" role="img" aria-label="Courbe d'inclinaison de la séance" style="height:56px"></svg>
+    </div>
+    <details class="sum-more"><summary>Plus de détails</summary><div class="ds-cells" id="sumMore"></div></details>
+    <button type="button" class="btn primary" id="sumClose">Fermer le bilan</button>
+  </div>
+</dialog>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<div class="navdock">
+<nav class="ds-tabbar" id="tabbar" aria-label="Sections">
+  <span class="pill" aria-hidden="true"></span>
+  <button type="button" class="tab" data-tab="seance" aria-current="page" aria-label="Séance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="13" cy="4" r="2"/><path d="M11 21l2-6 2 2v4M7 12l3-4 3 1 2 3 3 1M10 8l-1 6-3 7"/></svg><span class="tl">Séance</span></button>
+  <button type="button" class="tab" data-tab="programmes" aria-label="Programmes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V14h4v6M10 20V9h4v11M16 20V4h4v16"/></svg><span class="tl">Programmes</span></button>
+  <button type="button" class="tab" data-tab="historique" aria-label="Historique"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="tl">Historique</span></button>
+  <button type="button" class="tab" data-tab="reglages" aria-label="Réglages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span class="tl">Réglages</span></button>
+</nav>
+</div>
+
+<script id="app">
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const store = {
+  get(k, d){ try { const v = localStorage.getItem('foulee.' + k); return v == null ? d : JSON.parse(v); } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem('foulee.' + k, JSON.stringify(v)); } catch(e){} },
+  has(k){ try { return localStorage.getItem('foulee.' + k) != null; } catch(e){ return false; } }
+};
+const fr1 = n => (Math.round(n * 10) / 10).toFixed(1).replace('.', ',');
+const fr2 = n => n.toFixed(2).replace('.', ',');
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const hms = s => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : String(m).padStart(2, '0')) + ':' + String(x).padStart(2, '0'); };
+const hex = a => [...a].map(b => b.toString(16).padStart(2, '0')).join(' ');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const ICON = {
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>'
+};
+
+/* ---------- Réglages ---------- */
+const settings = Object.assign({ weight: 75, kcal: 'machine10', startSpeed: 2.5, scan: 'filtered' }, store.get('settings', {}));
+const saveSettings = () => store.set('settings', settings);
+
+/* ---------- État ---------- */
+const S = {
+  mode: null,            // 'fitshow' | 'ftms' | 'demo' | null
+  status: 'off',         // off | idle | starting | running | paused | error
+  errorMsg: '',
+  speed: 0, incline: 0, countdown: 0,
+  targetSpeed: settings.startSpeed, targetIncline: 0,
+  limits: { minS: 1, maxS: 12, minI: 0, maxI: 12 },
+  m: { elapsed: null, distance: null, kcal: null, hr: null, steps: null }, // valeurs machine
+  loc: { elapsed: 0, distance: 0, kcal: 0 },                               // valeurs calculées
+  info: {}
+};
+let driver = null, session = null, prog = null;
+
+/* ---------- Journal ---------- */
+const logLines = [];
+function log(kind, msg){
+  const t = new Date().toLocaleTimeString('fr-FR');
+  logLines.push({ kind, text: t + '  ' + (kind === 'tx' ? '→ ' : kind === 'rx' ? '← ' : '') + msg });
+  if (logLines.length > 300) logLines.shift();
+  renderLog();
+}
+function renderLog(){
+  const el = $('#log'); if (!el || $('#tab-reglages').hidden) return;
+  el.innerHTML = logLines.map(l => `<span class="${l.kind === 'tx' ? 'tx' : l.kind === 'rx' ? 'rx' : l.kind === 'err' ? 'er' : ''}">${l.text.replace(/</g, '&lt;')}</span>`).join('\n');
+  el.scrollTop = el.scrollHeight;
+}
+
+/* ---------- Estimation calories (équations ACSM) ---------- */
+function kcalPerMin(speed, incline){
+  if (speed <= 0) return 0;
+  const v = speed * 1000 / 60, g = incline / 100;
+  const vo2 = speed < 8 ? 3.5 + 0.1 * v + 1.8 * v * g : 3.5 + 0.2 * v + 0.9 * v * g;
+  return vo2 * settings.weight / 1000 * 5;
+}
+const shown = {
+  elapsed: () => S.m.elapsed ?? S.loc.elapsed,
+  distance: () => S.m.distance ?? S.loc.distance,
+  kcal: () => {
+    if (settings.kcal === 'estimate' || S.m.kcal == null || S.mode === 'demo') return S.loc.kcal;
+    if (S.mode === 'fitshow' && settings.kcal === 'machine10') return S.m.kcal / 10;
+    return S.m.kcal;
+  }
+};
+
+/* ---------- Pilote FitShow (service FFF0) ---------- */
+function FitShowDriver(server, svc, wr, nt){
+  let queue = [], busy = false, buf = [], poll = null, alive = true;
+  const frame = p => { let x = 0; p.forEach(b => x ^= b); return new Uint8Array([0x02, ...p, x, 0x03]); };
+  const canNoResp = wr.properties.writeWithoutResponse;
+  async function pump(){
+    if (busy) return; busy = true;
+    while (queue.length && alive){
+      const f = queue.shift();
+      try { if (canNoResp) await wr.writeValueWithoutResponse(f); else await wr.writeValueWithResponse(f);
+        if (f[1] !== 0x51) log('tx', hex(f)); }
+      catch(e){ log('err', 'Écriture refusée : ' + e.message); }
+      await sleep(110);
+    }
+    busy = false;
+  }
+  const send = p => { queue.push(frame(p)); pump(); };
+  function onFrame(f){
+    const cmd = f[1], par = f[2];
+    if (cmd !== 0x51) log('rx', hex(f));
+    if (cmd === 0x50){
+      if (par === 0x02 && f.length >= 7){ S.limits.maxS = f[3] / 10; S.limits.minS = f[4] / 10; S.info['Vitesse'] = fr1(S.limits.minS) + ' à ' + fr1(S.limits.maxS) + ' km/h'; }
+      if (par === 0x03 && f.length >= 7){ S.limits.maxI = (f[3] << 24 >> 24); S.limits.minI = (f[4] << 24 >> 24); S.info['Inclinaison'] = S.limits.minI + ' à ' + S.limits.maxI + ' %'; }
+      if (par === 0x00 && f.length >= 7){ S.info['Modèle'] = 'marque ' + (f[3] | f[4] << 8) + ', modèle ' + (f[5] | f[6] << 8); }
+      if (par === 0x04 && f.length > 8){ S.info['Compteur total'] = (f[3] | f[4] << 8 | f[5] << 16 | f[6] << 24) + ' (unité tapis)'; }
+      renderPresets(); renderInfo(); return;
+    }
+    if (cmd === 0x51){
+      const map = { 0: 'idle', 1: 'idle', 2: 'starting', 3: 'running', 4: 'idle', 5: 'error', 6: 'error', 7: 'idle', 10: 'paused' };
+      if (par === 2 && f.length > 4) S.countdown = f[3];
+      if (par === 5) S.errorMsg = 'Erreur tapis E' + (f[3] ?? '?');
+      if (par === 6) S.errorMsg = 'Clé de sécurité absente';
+      if ((par === 3 || par === 10 || par === 4 || par === 1) && f.length >= 16){
+        S.speed = par === 3 ? f[3] / 10 : 0;
+        S.incline = f[4] << 24 >> 24;
+        S.m.elapsed = f[5] | f[6] << 8;
+        S.m.kcal = f[9] | f[10] << 8;
+        S.m.steps = f[11] | f[12] << 8;
+        S.m.hr = f[13] || null;
+        S.m.rawDist = f[7] | f[8] << 8;
+      }
+      setStatus(map[par] ?? 'idle');
+    }
+  }
+  nt.addEventListener('characteristicvaluechanged', e => {
+    const v = new Uint8Array(e.target.value.buffer); buf.push(...v);
+    for (;;){
+      const s = buf.indexOf(0x02); if (s < 0){ buf = []; break; }
+      if (s > 0) buf = buf.slice(s);
+      let found = false;
+      for (let i = 3; i < buf.length; i++){
+        if (buf[i] !== 0x03) continue;
+        let x = 0; for (let j = 1; j < i - 1; j++) x ^= buf[j];
+        if (x === buf[i - 1]){ onFrame(buf.slice(0, i + 1)); buf = buf.slice(i + 1); found = true; break; }
+      }
+      if (!found){ if (buf.length > 64) buf = buf.slice(1); else break; }
+    }
+  });
+  return {
+    name: 'FitShow',
+    async init(){
+      await nt.startNotifications();
+      const d = new Date();
+      send([0x50, 0x00, d.getFullYear() - 2000, d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds()]);
+      send([0x50, 0x02]); send([0x50, 0x03]); send([0x50, 0x04]);
+      poll = setInterval(() => { if (!queue.length) { queue.push(frame([0x51])); pump(); } }, 700);
+    },
+    start(){ send([0x53, 0x01, 0, 0, 0, 0, 0, 0, 0, 0]); },
+    pause(){ send([0x53, 0x06]); },
+    stop(){ send([0x53, 0x03]); },
+    setTarget(sp, inc){ send([0x53, 0x02, Math.round(sp * 10) & 0xff, Math.round(inc) & 0xff]); },
+    disconnect(){ alive = false; clearInterval(poll); try { server.disconnect(); } catch(e){} }
+  };
+}
+
+/* ---------- Pilote FTMS (service 0x1826, standard Bluetooth) ---------- */
+function FTMSDriver(server, svc, data, cp, st){
+  const write = async (arr, label) => { try { await cp.writeValueWithResponse(new Uint8Array(arr)); log('tx', label + '  ' + hex(arr)); } catch(e){ log('err', label + ' refusé : ' + e.message); } };
+  data.addEventListener('characteristicvaluechanged', e => {
+    const dv = e.target.value, f = dv.getUint16(0, true); let i = 2;
+    try {
+      if (!(f & 1)){ S.speed = dv.getUint16(i, true) / 100; i += 2; }
+      if (f & 2) i += 2;
+      if (f & 4){ S.m.distance = (dv.getUint8(i) | dv.getUint8(i + 1) << 8 | dv.getUint8(i + 2) << 16) / 1000; i += 3; }
+      if (f & 8){ S.incline = dv.getInt16(i, true) / 10; i += 4; }
+      if (f & 16) i += 4;
+      if (f & 32) i += 1;
+      if (f & 64) i += 1;
+      if (f & 128){ const k = dv.getUint16(i, true); if (k !== 0xffff) S.m.kcal = k; i += 5; }
+      if (f & 256){ S.m.hr = dv.getUint8(i) || null; i += 1; }
+      if (f & 512) i += 1;
+      if (f & 1024){ S.m.elapsed = dv.getUint16(i, true); i += 2; }
+    } catch(err){}
+    if (S.speed > 0 && (S.status === 'idle' || S.status === 'starting')) setStatus('running');
+    render();
+  });
+  if (st) st.addEventListener('characteristicvaluechanged', e => {
+    const v = new Uint8Array(e.target.value.buffer); log('rx', 'statut ' + hex(v));
+    if (v[0] === 0x04) setStatus('running');
+    if (v[0] === 0x02) setStatus(v[1] === 2 ? 'paused' : 'idle');
+    if (v[0] === 0x01) setStatus('idle');
+  });
+  cp.addEventListener('characteristicvaluechanged', e => log('rx', 'réponse ' + hex(new Uint8Array(e.target.value.buffer))));
+  return {
+    name: 'FTMS',
+    async init(){
+      await data.startNotifications();
+      try { await cp.startNotifications(); } catch(e){}
+      if (st) try { await st.startNotifications(); } catch(e){}
+      try { const r = await svc.getCharacteristic(0x2AD4); const v = await r.readValue();
+        S.limits.minS = v.getUint16(0, true) / 100; S.limits.maxS = v.getUint16(2, true) / 100; S.info['Vitesse'] = fr1(S.limits.minS) + ' à ' + fr1(S.limits.maxS) + ' km/h'; } catch(e){}
+      try { const r = await svc.getCharacteristic(0x2AD5); const v = await r.readValue();
+        S.limits.minI = v.getInt16(0, true) / 10; S.limits.maxI = v.getInt16(2, true) / 10; S.info['Inclinaison'] = S.limits.minI + ' à ' + S.limits.maxI + ' %'; } catch(e){}
+      await write([0x00], 'prise de contrôle');
+      setStatus('idle'); renderPresets(); renderInfo();
+    },
+    async start(){ await write([0x00], 'prise de contrôle'); await this.setTarget(S.targetSpeed, S.targetIncline); await write([0x07], 'démarrer'); setStatus('starting'); },
+    pause(){ write([0x08, 0x02], 'pause'); setStatus('paused'); },
+    stop(){ write([0x08, 0x01], 'stop'); setStatus('idle'); },
+    async setTarget(sp, inc){
+      const s = Math.round(sp * 100), n = Math.round(inc * 10) & 0xffff;
+      await write([0x02, s & 0xff, s >> 8], 'vitesse ' + fr1(sp));
+      await write([0x03, n & 0xff, n >> 8], 'inclinaison ' + inc);
+    },
+    disconnect(){ try { server.disconnect(); } catch(e){} }
+  };
+}
+
+/* ---------- Pilote démo ---------- */
+function DemoDriver(){
+  let t = null;
+  return {
+    name: 'Démo',
+    async init(){
+      S.limits = { minS: 1, maxS: 14, minI: 0, maxI: 15 };
+      S.info = { 'Vitesse': '1,0 à 14,0 km/h', 'Inclinaison': '0 à 15 %', 'Modèle': 'tapis simulé' };
+      setStatus('idle'); renderPresets(); renderInfo();
+      t = setInterval(() => {
+        if (S.status === 'starting'){ S.countdown--; if (S.countdown <= 0) setStatus('running'); }
+        const goal = S.status === 'running' ? S.targetSpeed : 0;
+        S.speed = Math.abs(goal - S.speed) <= 0.5 ? goal : S.speed + Math.sign(goal - S.speed) * 0.5;
+        const ig = S.targetIncline;
+        S.incline = Math.abs(ig - S.incline) <= 1 ? ig : S.incline + Math.sign(ig - S.incline);
+        S.m.steps = S.status === 'running' ? (S.m.steps || 0) + Math.round(S.speed * 2.6) : S.m.steps;
+        render();
+      }, 1000);
+    },
+    start(){ if (S.status === 'paused') return setStatus('running'); S.countdown = 3; S.m.steps = 0; setStatus('starting'); },
+    pause(){ setStatus('paused'); },
+    stop(){ setStatus('idle'); },
+    setTarget(){},
+    disconnect(){ clearInterval(t); }
+  };
+}
+
+/* ---------- Connexion ---------- */
+function notice(html, err){ const n = $('#notice'); if (!html){ n.hidden = true; return; } n.className = 'notice' + (err ? ' err' : ''); n.innerHTML = html; n.hidden = false; }
+// Message adapté à l'endroit où la page est ouverte
+function noBtMessage(){
+  const framed = window.top !== window.self;
+  if (framed) return `<div><b>Le Bluetooth n'est pas accessible ici.</b> claude.ai affiche cette page dans un cadre qui bloque le Bluetooth. Télécharge Foulée (onglet Réglages) et ouvre le fichier dans Chrome. Le mode démo marche partout.</div>`;
+  if (!window.isSecureContext) return `<div><b>Chrome bloque le Bluetooth sur ce fichier.</b> La page est ouverte depuis une adresse <code>${location.protocol}</code> que Chrome ne considère pas comme sécurisée. Il faut l'ouvrir depuis une adresse https://. Détail dans Réglages, journal Bluetooth.</div>`;
+  return `<div><b>Ce navigateur ne gère pas le Bluetooth web.</b> Ouvre la page dans Chrome (Android ou ordinateur) ou dans Bluefy (iPhone). Détail dans Réglages, journal Bluetooth.</div>`;
+}
+// Traces de diagnostic, au démarrage et à chaque tentative
+async function diag(){
+  log('', 'Diag · adresse : ' + location.protocol + '//' + location.host + location.pathname.split('/').pop());
+  log('', 'Diag · contexte sécurisé : ' + (window.isSecureContext ? 'oui' : 'NON') + ' · dans un cadre : ' + (window.top !== window.self ? 'oui' : 'non'));
+  log('', 'Diag · navigateur : ' + navigator.userAgent);
+  log(navigator.bluetooth ? '' : 'err', 'Diag · API Bluetooth web : ' + (navigator.bluetooth ? 'présente' : 'ABSENTE'));
+  if (navigator.bluetooth && navigator.bluetooth.getAvailability){
+    try { log('', 'Diag · Bluetooth du téléphone : ' + ((await navigator.bluetooth.getAvailability()) ? 'disponible' : 'INDISPONIBLE (éteint, ou permission refusée à Chrome)')); }
+    catch(e){ log('err', 'Diag · getAvailability : ' + e.name + ' : ' + e.message); }
+  }
+  try { const st = await navigator.permissions.query({ name: 'bluetooth' }); log('', 'Diag · permission Bluetooth : ' + st.state); } catch(e){}
+}
+
+async function connect(){
+  log('', '— Clic sur « Connecter le tapis »');
+  if (!navigator.bluetooth){ log('err', 'Arrêt : API Bluetooth web absente' + (window.isSecureContext ? '' : ' (page non sécurisée)')); notice(noBtMessage(), true); return; }
+  try {
+    notice('');
+    const all = settings.scan === 'all';
+    log('', 'Ouverture du sélecteur Bluetooth (' + (all ? 'tous les appareils' : 'filtre FS-, FitShow, FTMS') + ')…');
+    const opts = { optionalServices: [0xfff0, 0xffe0, 0x1826, 0x180a] };
+    if (all) opts.acceptAllDevices = true; else opts.filters = [{ namePrefix: 'FS-' }, { services: [0xfff0] }, { services: [0x1826] }];
+    const device = await navigator.bluetooth.requestDevice(opts);
+    $('#devName').textContent = device.name || 'Tapis';
+    log('', 'Appareil choisi : ' + (device.name || '(sans nom)') + ' · id ' + device.id);
+    log('', 'Connexion GATT…');
+    device.addEventListener('gattserverdisconnected', () => { log('err', 'Tapis déconnecté'); if (S.status === 'running') finishSession(); driver = null; S.mode = null; setStatus('off'); });
+    const server = await device.gatt.connect();
+    log('', 'GATT connecté, lecture des services…');
+    const services = await server.getPrimaryServices();
+    const uuids = services.map(s => s.uuid.slice(4, 8));
+    log('', 'Services : ' + uuids.join(', '));
+    const ftms = services.find(s => s.uuid.startsWith('00001826'));
+    const fs = services.find(s => s.uuid.startsWith('0000fff0')) || services.find(s => s.uuid.startsWith('0000ffe0'));
+    resetCounters();
+    if (ftms){
+      const chars = await ftms.getCharacteristics(), byId = id => chars.find(c => c.uuid.startsWith('0000' + id));
+      const data = byId('2acd'), cp = byId('2ad9');
+      if (data && cp){ driver = FTMSDriver(server, ftms, data, cp, byId('2ada')); S.mode = 'ftms'; }
+    }
+    if (!driver && fs){
+      const chars = await fs.getCharacteristics();
+      const wr = chars.find(c => /^0000(fff2|ffe1)/.test(c.uuid)) || chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
+      const nt = chars.find(c => /^0000(fff1|ffe1|ffe4)/.test(c.uuid) && (c.properties.notify || c.properties.indicate)) || chars.find(c => c.properties.notify);
+      if (wr && nt){ driver = FitShowDriver(server, fs, wr, nt); S.mode = 'fitshow'; }
+    }
+    if (!driver){ notice('<div><b>Protocole non reconnu.</b> Le tapis expose les services ' + uuids.join(', ') + '. Copie le journal (onglet Réglages) pour qu\'on ajoute son protocole.</div>', true); server.disconnect(); return; }
+    S.info['Protocole'] = driver.name;
+    await driver.init();
+    log('', 'Prêt, protocole ' + driver.name);
+    render();
+  } catch(e){
+    log('err', 'Échec : ' + e.name + ' : ' + e.message);
+    if (e.name === 'NotFoundError') {
+      if (/cancel/i.test(e.message)) { log('', 'Sélecteur fermé sans choisir d\'appareil'); return; }
+      notice('<div><b>Aucun tapis trouvé.</b> ' + e.message + '. Vérifie que le Bluetooth et la localisation du téléphone sont activés, que Chrome a l\'autorisation « Appareils à proximité », et que FitShow est fermée. Tu peux aussi passer la recherche sur « Tous les appareils » dans Réglages.</div>', true);
+      return;
+    }
+    if (e.name === 'SecurityError' || /permission|policy|allowed/i.test(e.message)) { notice(noBtMessage(), true); return; }
+    notice('<div><b>Connexion impossible.</b> ' + e.message + '. Vérifie que le tapis est allumé et qu\'aucune autre app (FitShow) n\'y est connectée. Détail dans Réglages, journal Bluetooth.</div>', true);
+  }
+}
+async function startDemo(){
+  if (driver) driver.disconnect();
+  resetCounters();
+  driver = DemoDriver(); S.mode = 'demo'; $('#devName').textContent = 'Tapis simulé';
+  notice('');
+  await driver.init(); log('', 'Mode démo actif'); render();
+}
+
+/* ---------- Toast ---------- */
+let toastT = null;
+function toast(msg, undo){
+  const t = $('#toast'); t.innerHTML = '<span></span>'; t.firstChild.textContent = msg;
+  if (undo){ const b = document.createElement('button'); b.type = 'button'; b.textContent = 'Annuler'; b.addEventListener('click', () => { undo(); t.hidden = true; }); t.appendChild(b); }
+  t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, undo ? 5000 : 3500);
+}
+
+/* ---------- Statut et séance ---------- */
+function resetCounters(){ S.m = { elapsed: null, distance: null, kcal: null, hr: null, steps: null }; S.loc = { elapsed: 0, distance: 0, kcal: 0 }; }
+function setStatus(st){
+  const prev = S.status; if (st === prev) return; S.status = st;
+  if (st !== 'error') S.errorMsg = '';
+  if (st === 'starting' && !boot) startBoot();
+  if (st === 'running' && prev !== 'paused'){
+    if (!session || prev === 'idle' || prev === 'off'){ if (prev !== 'starting' || !session) beginSession(); }
+    if (!boot) startBoot();
+  }
+  if (st === 'running' && prev === 'paused' && driver && !boot) startBoot();
+  if (st !== 'running' && st !== 'starting') boot = null;
+  if ((st === 'idle' || st === 'off') && (prev === 'running' || prev === 'paused')) finishSession();
+  wake(st === 'running');
+  render();
+}
+function beginSession(){
+  resetCounters();
+  session = { id: Date.now(), start: Date.now(), program: prog ? prog.p.name : null, samples: [] };
+}
+function finishSession(){
+  if (!session) return;
+  const el = shown.elapsed();
+  if (el >= 20){
+    const st = sessionStats(session.samples);
+    const s = { id: session.id, start: session.start, end: Date.now(), program: session.program, duration: el, distance: shown.distance(), kcal: shown.kcal(),
+      maxSpeed: st.maxSpeed, avgIncline: st.avgIncline, maxIncline: st.maxIncline, elevation: st.elevation,
+      steps: S.m.steps || null, hrAvg: st.hrAvg, hrMax: st.hrMax, source: S.mode,
+      samples: session.samples.filter((_, i) => i % 10 === 0) };
+    s.avgSpeed = el ? s.distance / (el / 3600) : 0;
+    const h = store.get('sessions', []); h.unshift(s); store.set('sessions', h.slice(0, 200));
+    log('', 'Séance enregistrée : ' + hms(el) + ', ' + fr2(s.distance) + ' km');
+    showSummary(s, true);
+  }
+  session = null; prog = null; renderHistory();
+}
+
+/* ---------- Bilan d'une séance ---------- */
+// Calculé sur les mesures seconde par seconde à la fin ; les anciennes séances sont recalculées sur leurs mesures espacées de 10 s.
+function sessionStats(sm){
+  sm = sm || [];
+  const moving = sm.filter(x => x[1] > 0), n = moving.length;
+  let elevation = 0;
+  for (let k = 1; k < sm.length; k++){ const dt = Math.max(0, sm[k][0] - sm[k - 1][0]); elevation += sm[k][1] / 3.6 * dt * Math.max(0, sm[k][2]) / 100; }
+  const hr = sm.map(x => x[3]).filter(v => v > 0);
+  return {
+    maxSpeed: Math.max(0, ...sm.map(x => x[1])),
+    avgIncline: n ? moving.reduce((a, x) => a + x[2], 0) / n : null,
+    maxIncline: sm.length ? Math.max(...sm.map(x => x[2])) : null,
+    elevation: sm.length > 1 ? elevation : null,
+    hrAvg: hr.length ? Math.round(hr.reduce((a, v) => a + v, 0) / hr.length) : null,
+    hrMax: hr.length ? Math.max(...hr) : null
+  };
+}
+function lineSVG(sm, idx, H){
+  if (!sm || sm.length < 2) return '';
+  const max = Math.max(idx === 1 ? 4 : 5, ...sm.map(x => x[idx])) * 1.1, n = sm.length - 1;
+  const pts = sm.map((x, k) => (k / n * 600).toFixed(1) + ',' + (H - 4 - x[idx] / max * (H - 10)).toFixed(1)).join(' ');
+  return `<line x1="0" x2="600" y1="${H / 2}" y2="${H / 2}" stroke="var(--edge)" stroke-width="1" vector-effect="non-scaling-stroke"/><polyline points="${pts}" fill="none" stroke="var(--data-line)" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+}
+function showSummary(s, justEnded){
+  const st = sessionStats(s.samples);
+  const g = (k) => s[k] != null ? s[k] : st[k];
+  const d0 = new Date(s.start), d1 = s.end ? new Date(s.end) : new Date(s.start + s.duration * 1000);
+  const t = d => d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const pace = s.avgSpeed > 0.5 ? (() => { const sec = Math.round(3600 / s.avgSpeed); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0') + ' /km'; })() : null;
+  const inc = v => v == null ? null : fr1(v) + ' %';
+  const main = [
+    ['Durée', hms(s.duration)], ['Distance', fr2(s.distance) + ' km'],
+    ['Vitesse moyenne', fr1(s.avgSpeed) + ' km/h'], ['Vitesse max', g('maxSpeed') != null ? fr1(g('maxSpeed')) + ' km/h' : null],
+    ['Pente moyenne', inc(g('avgIncline'))], ['Pente max', g('maxIncline') != null ? Math.round(g('maxIncline')) + ' %' : null],
+    ['Dénivelé positif', g('elevation') != null ? Math.round(g('elevation')) + ' m' : null], ['Calories', Math.round(s.kcal) + ' kcal']
+  ];
+  const more = [
+    ['Allure moyenne', pace], ['Pas', s.steps ? s.steps.toLocaleString('fr-FR') : null],
+    ['Cardio moyen', g('hrAvg') ? g('hrAvg') + ' bpm' : null], ['Cardio max', g('hrMax') ? g('hrMax') + ' bpm' : null],
+    ['Début', t(d0)], ['Fin', t(d1)],
+    ['Programme', s.program || 'Séance libre'], ['Mesures', s.source === 'demo' ? 'Mode démo' : s.source === 'ftms' ? 'Tapis (FTMS)' : s.source === 'fitshow' ? 'Tapis (FitShow)' : (s.example ? 'Exemple' : 'Tapis')]
+  ];
+  const cells = a => a.filter(([, v]) => v != null).map(([l, v]) => `<div class="ds-cell"><span>${l}</span><b>${String(v).replace(/</g, '&lt;')}</b></div>`).join('');
+  $('#sumTitle').textContent = justEnded ? 'Séance terminée' : 'Bilan de la séance';
+  $('#sumWhen').textContent = d0.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) + ', de ' + t(d0) + ' à ' + t(d1) + (justEnded ? '. Séance enregistrée dans l\'historique.' : '.');
+  $('#sumHero').innerHTML = `<b>${fr2(s.distance)} km</b><div><span>${hms(s.duration)} de marche à ${fr1(s.avgSpeed)} km/h</span><small>${g('avgIncline') != null ? 'Pente moyenne ' + fr1(g('avgIncline')) + ' %, ' : ''}${Math.round(s.kcal)} kcal</small></div>`;
+  $('#sumCells').innerHTML = cells(main);
+  $('#sumMore').innerHTML = cells(more);
+  $('#sumSpeed').innerHTML = lineSVG(s.samples, 1, 84);
+  $('#sumInc').innerHTML = lineSVG(s.samples, 2, 56);
+  $('#sumCharts').hidden = !(s.samples && s.samples.length > 1);
+  const dlg = $('#summary');
+  if (!dlg.open){ try { dlg.showModal(); } catch(e){ dlg.setAttribute('open', ''); } }
+}
+$('#sumClose').addEventListener('click', () => { const dlg = $('#summary'); try { dlg.close(); } catch(e){ dlg.removeAttribute('open'); } });
+
+/* ---------- Commandes ---------- */
+let tDeb = null;
+// Synchronisation avec le tapis :
+// - une consigne envoyée par l'appli reste « en attente » jusqu'à ce que le tapis l'affiche ; renvoyée toutes les 2 s (5 fois max)
+//   si le tapis ne bouge pas (il ignore souvent la consigne pendant sa mise en route, d'où le 1 km/h au démarrage) ;
+// - un écart sans consigne en attente vient du tapis lui-même (boutons ou télécommande) : l'appli reprend ses valeurs.
+const sync = { pending: false, t: 0, tries: 0, lastS: null, lastI: null };
+// Mise en route : le tapis fait son compte à rebours, démarre à sa vitesse mini et ignore les consignes un moment.
+// On attend qu'il roule, on laisse 2 s, puis on envoie la vitesse toutes les 2 s jusqu'à ce qu'il l'affiche (30 s max).
+// Ce temps-là ne compte pas dans le programme.
+let boot = null;
+function startBoot(){
+  if (!driver) return;
+  if (S.mode === 'demo'){ sync.tries = 0; sendTarget(); return; }
+  boot = { moveAt: null, lastSend: 0, sends: 0 };
+  sync.pending = false;
+  log('', 'Démarrage à ' + fr1(S.targetSpeed) + ' km/h, ' + S.targetIncline + ' % : consigne envoyée dès maintenant, puis chaque seconde');
+  bootSend(S.status === 'starting' ? 'pendant le compte à rebours' : 'au démarrage');
+}
+function bootSend(when){
+  driver.setTarget(S.targetSpeed, S.targetIncline);
+  boot.lastSend = Date.now(); boot.sends++;
+  log('', 'Vitesse de départ ' + fr1(S.targetSpeed) + ' km/h envoyée ' + when + ' (' + boot.sends + ')');
+}
+function bootTick(){
+  // Pendant le compte à rebours : on renvoie chaque seconde, pour que le tapis parte directement à la bonne vitesse s'il l'accepte
+  if (S.status === 'starting'){ if (Date.now() - boot.lastSend >= 1000) bootSend('pendant le compte à rebours'); return; }
+  if (S.speed <= 0) return;
+  const now = Date.now();
+  if (!boot.moveAt){ boot.moveAt = now; log('', 'Le tapis roule à ' + fr1(S.speed) + ' km/h'); }
+  const offS = Math.abs(S.speed - S.targetSpeed) > 0.05, offI = Math.abs(S.incline - S.targetIncline) > 0.5;
+  const moved = S.speed !== sync.lastS || S.incline !== sync.lastI;
+  sync.lastS = S.speed; sync.lastI = S.incline;
+  if (!offS && !offI){
+    log('', 'Vitesse de départ atteinte : ' + fr1(S.speed) + ' km/h, ' + Math.round(S.incline) + ' %' + (now - boot.moveAt < 1500 ? ' dès le départ' : ' après ' + Math.round((now - boot.moveAt) / 1000) + ' s') + (prog ? '. Le programme démarre.' : ''));
+    boot = null; sync.pending = false; sync.tries = 0; return;
+  }
+  if (now - boot.moveAt > 30000){
+    log('err', 'Le tapis n\'a pas pris la vitesse de départ en 30 s : l\'appli s\'aligne sur lui');
+    boot = null; adoptFromBelt(); return;
+  }
+  if (moved && S.speed > 0 && now - boot.lastSend < 3000) return;   // il accélère vers la consigne
+  if (now - boot.lastSend >= 1000) bootSend('au démarrage');
+}
+function sendTarget(){
+  if (!driver) return;
+  driver.setTarget(S.targetSpeed, S.targetIncline);
+  sync.pending = true; sync.t = Date.now(); sync.tries++;
+}
+function setTarget(sp, inc){
+  S.targetSpeed = clamp(Math.round(sp * 10) / 10, S.limits.minS, S.limits.maxS);
+  S.targetIncline = clamp(Math.round(inc), S.limits.minI, S.limits.maxI);
+  sync.pending = true; sync.t = Date.now(); sync.tries = 0;
+  render();
+  clearTimeout(tDeb);
+  tDeb = setTimeout(() => { if (driver && S.status === 'running' && !boot) sendTarget(); }, 250);
+}
+function syncTick(){
+  if (!driver || S.mode === 'demo') return;
+  if (boot) return bootTick();
+  if (S.speed <= 0) return;
+  const offS = Math.abs(S.speed - S.targetSpeed) > 0.05, offI = Math.abs(S.incline - S.targetIncline) > 0.5;
+  const moved = S.speed !== sync.lastS || S.incline !== sync.lastI;
+  sync.lastS = S.speed; sync.lastI = S.incline;
+  if (!offS && !offI){
+    if (sync.pending && sync.tries > 1) log('', 'Consigne appliquée par le tapis');
+    sync.pending = false; sync.tries = 0; return;
+  }
+  if (sync.pending){
+    const age = Date.now() - sync.t;
+    if (age < 2000 || (moved && age < 15000)) return;   // commande en route, ou le tapis accélère vers la consigne
+    if (sync.tries < 5){ log('', 'Le tapis n\'a pas pris la consigne ' + fr1(S.targetSpeed) + ' km/h, ' + S.targetIncline + ' % : nouvel envoi (' + (sync.tries + 1) + '/5)'); sendTarget(); return; }
+    log('err', 'Le tapis refuse la consigne : l\'appli s\'aligne sur lui');
+    sync.pending = false;
+  }
+  adoptFromBelt();
+}
+function adoptFromBelt(){
+  const sp = Math.round(S.speed * 10) / 10, inc = Math.round(S.incline);
+  if (sp === S.targetSpeed && inc === S.targetIncline) return;
+  log('', 'Changé sur le tapis : ' + fr1(sp) + ' km/h, ' + inc + ' %');
+  S.targetSpeed = sp; S.targetIncline = inc;
+  if (prog && prog.seg >= 0) prog.manual = { seg: prog.seg, s: sp, i: inc };
+}
+function startPause(){
+  if (!driver){ notice('<div><b>Aucun tapis connecté.</b> Connecte le tapis ou lance le mode démo.</div>'); return; }
+  if (S.status === 'running') driver.pause(); else driver.start();
+}
+function stopBelt(){ if (driver) driver.stop(); }
+
+/* ---------- Programmes ---------- */
+const EXAMPLES = [
+  { id: 'p1', name: 'Marche 15 min', segments: [{d:180,s:2.5,i:0},{d:540,s:3,i:0},{d:180,s:2.5,i:0}] },
+  { id: 'p2', name: 'Marche 20 min', segments: [{d:180,s:2.5,i:0},{d:840,s:3,i:0},{d:180,s:2.5,i:0}] },
+  { id: 'p3', name: 'Marche 20 min, finale à 3,5', segments: [{d:180,s:2.5,i:0},{d:540,s:3,i:0},{d:300,s:3.5,i:0},{d:180,s:2.5,i:0}] }
+];
+let programs = store.get('programs', null) || EXAMPLES;
+const saveProgs = () => store.set('programs', programs);
+// Programmes ajoutés après coup : posés une seule fois, même si la liste existe déjà (supprimés ensuite = ne reviennent pas)
+const ADDED = [
+  { id: 'p4', name: 'Collines 15 min', segments: [
+    {d:120,s:2.5,i:0},{d:90,s:3,i:1},{d:90,s:3,i:2},{d:90,s:3.5,i:3},{d:90,s:3,i:0},
+    {d:90,s:3.5,i:2},{d:90,s:3.5,i:3},{d:90,s:3,i:1},{d:150,s:2.5,i:0}] }
+];
+ADDED.forEach(p => {
+  if (store.get('added.' + p.id, false)) return;
+  if (!programs.some(x => x.id === p.id)) { programs.push(p); saveProgs(); }
+  store.set('added.' + p.id, true);
+});
+const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
+const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
+
+function profileSVG(segs, W, H, at){
+  // Vitesse en aire data-line en haut ; l'inclinaison a sa propre bande de 12 px en bas (pas de double échelle)
+  const tot = segs.reduce((a, s) => a + s.d, 0) || 1, maxS = Math.max(4, ...segs.map(s => s.s)), maxI = Math.max(6, ...segs.map(s => s.i)), HS = H - 16;
+  let x = 0, sp = `M0 ${HS}`, top = '', inc = '';
+  segs.forEach((s, k) => { const x2 = x + s.d / tot * W, y = HS - 2 - s.s / maxS * (HS - 6), hi = s.i / maxI * 12;
+    sp += ` L${x} ${y} L${x2} ${y}`; top += (k ? ' L' : 'M') + `${x} ${y} L${x2} ${y}`;
+    if (hi > 0) inc += `<rect x="${x}" y="${H - hi}" width="${Math.max(0, x2 - x - 2)}" height="${hi}" fill="var(--gold)"/>`;
+    x = x2; });
+  sp += ` L${W} ${HS} Z`;
+  let cur = '';
+  if (at != null){ const cx = Math.min(1, at / tot) * W; cur = `<rect x="0" y="0" width="${cx}" height="${H}" fill="var(--ink)" opacity=".06"/><line x1="${cx}" x2="${cx}" y1="0" y2="${H}" stroke="var(--ink)" stroke-width="2" vector-effect="non-scaling-stroke"/>`; }
+  return `<path d="${sp}" fill="var(--data-line)" opacity=".22"/><path d="${top}" fill="none" stroke="var(--data-line)" stroke-width="2" vector-effect="non-scaling-stroke"/>${inc}${cur}`;
+}
+function launchProgram(id){
+  const p = programs.find(x => x.id === id); if (!p) return;
+  if (!driver){ notice('<div><b>Aucun tapis connecté.</b> Connecte le tapis ou lance le mode démo avant de lancer un programme.</div>'); return; }
+  prog = { p, t: 0, seg: -1 };
+  if (session) session.program = p.name;
+  selectTab('seance'); window.scrollTo(0, 0);
+  applySegment(0);
+  if (S.status !== 'running') driver.start();
+}
+function applySegment(k){ const s = prog.p.segments[k]; prog.seg = k; prog.manual = null; setTarget(s.s, s.i); log('', 'Programme : étape ' + (k + 1) + ', ' + fr1(s.s) + ' km/h, ' + s.i + ' %'); }
+function progTick(){
+  if (!prog || S.status !== 'running' || boot) return;
+  prog.t++;
+  const tot = progDur(prog.p);
+  if (prog.t >= tot){ log('', 'Programme terminé'); stopBelt(); if (S.mode !== 'ftms' && S.mode !== 'demo') {} return; }
+  let acc = 0, k = 0; for (; k < prog.p.segments.length; k++){ acc += prog.p.segments[k].d; if (prog.t < acc) break; }
+  if (k !== prog.seg) applySegment(k);
+}
+
+let editing = null;
+function openEditor(p){
+  editing = JSON.parse(JSON.stringify(p || { id: 'p' + Date.now(), name: 'Nouveau programme', segments: [{d:180,s:2.5,i:0},{d:540,s:3,i:0},{d:180,s:2.5,i:0}] }));
+  editing.isNew = !p; renderEditor(); $('#editor').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function renderEditor(){
+  const ed = $('#editor');
+  if (!editing){ ed.hidden = true; ed.innerHTML = ''; return; }
+  ed.hidden = false; ed.className = 'editor';
+  ed.innerHTML = `<label class="field"><span class="label">Nom du programme</span><input type="text" id="edName" value="${editing.name.replace(/"/g, '&quot;')}"></label>
+    <svg class="profile" id="edProfile" viewBox="0 0 600 64" preserveAspectRatio="none">${profileSVG(editing.segments, 600, 64)}</svg>
+    <ol class="steps">
+    ${editing.segments.map((s, k) => `<li class="step" data-k="${k}">
+      <div class="step-head"><span class="step-n">Étape ${k + 1}</span><span class="step-act"><button class="iconbtn" data-a="dup" title="Dupliquer l'étape" aria-label="Dupliquer l'étape ${k + 1}">${ICON.copy}</button><button class="iconbtn" data-a="del" title="Supprimer l'étape" aria-label="Supprimer l'étape ${k + 1}">${ICON.x}</button></span></div>
+      <div class="step-fields">
+        <label class="field"><span class="label">Durée</span><span class="inunit"><input id="ed-d-${k}" type="number" inputmode="decimal" min="0.25" step="0.25" value="${+(s.d / 60).toFixed(2)}" data-f="d"><em>min</em></span></label>
+        <label class="field"><span class="label">Vitesse</span><span class="inunit"><input id="ed-s-${k}" type="number" inputmode="decimal" min="${S.limits.minS}" max="${S.limits.maxS}" step="0.1" value="${s.s}" data-f="s"><em>km/h</em></span></label>
+        <label class="field"><span class="label">Inclinaison</span><span class="inunit"><input id="ed-i-${k}" type="number" inputmode="numeric" min="${S.limits.minI}" max="${S.limits.maxI}" step="1" value="${s.i}" data-f="i"><em>%</em></span></label>
+      </div></li>`).join('')}
+    </ol>
+    <div class="toolbar"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small" id="edAdd">Ajouter une étape</button><button class="btn small" id="edAdd2">Ajouter 3 × (1 min à 3,5 / 1 min à 2,5)</button></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="num" id="edSum" style="color:var(--muted);font-size:14px"></span><button class="btn ghost" id="edCancel">Annuler</button><button class="btn primary" id="edSave">Enregistrer</button></div></div>`;
+  edSum();
+}
+function edSum(){ const el = $('#edSum'); if (el) el.textContent = hms(progDur(editing)) + ' · ≈ ' + fr2(progDist(editing)) + ' km'; const pf = $('#edProfile'); if (pf) pf.innerHTML = profileSVG(editing.segments, 600, 64); }
+
+function renderPrograms(){
+  $('#progList').innerHTML = programs.map(p => `<article class="pcard" data-id="${p.id}">
+    <h3>${p.name.replace(/</g, '&lt;')}</h3>
+    <svg class="profile" viewBox="0 0 600 64" preserveAspectRatio="none">${profileSVG(p.segments, 600, 64)}</svg>
+    <div class="facts num"><span><b>${hms(progDur(p))}</b> durée</span><span><b>${fr2(progDist(p))}</b> km</span><span><b>${fr1(Math.max(...p.segments.map(s => s.s)))}</b> km/h max</span><span><b>${p.segments.length}</b> étapes</span></div>
+    <div class="actions"><button class="btn primary small" data-a="run">Lancer</button><button class="btn small" data-a="edit">Modifier</button><button class="btn small" data-a="copy">Dupliquer</button><button class="btn small ghost" data-a="del">Supprimer</button></div>
+  </article>`).join('') || '<div class="empty">Aucun programme. Crée le premier avec « Nouveau programme ».</div>';
+}
+
+/* ---------- Historique ---------- */
+function seedHistory(){
+  if (store.has('sessions')) return;
+  const day = 864e5, now = Date.now(), mk = (ago, h, dur, avg, prog, inc) => {
+    const samples = Array.from({ length: Math.ceil(dur / 10) }, (_, k) => [k * 10, +(avg + Math.sin(k / 4) * .3).toFixed(1), inc]);
+    const d = new Date(now - ago * day); d.setHours(h, 15, 0, 0);
+    return { id: d.getTime(), start: d.getTime(), program: prog, duration: dur, distance: avg * dur / 3600, kcal: kcalPerMin(avg, inc) * dur / 60, avgSpeed: avg, maxSpeed: avg + 2, samples, example: true };
+  };
+  store.set('sessions', [mk(1, 19, 900, 2.9, 'Marche 15 min', 0), mk(1, 12, 900, 3.0, 'Marche 15 min', 0), mk(2, 18, 600, 2.6, null, 0)]);
+}
+function sparkSVG(samples, W, H){
+  if (!samples || samples.length < 2) return '';
+  const max = Math.max(...samples.map(s => s[1]), 1), n = samples.length - 1;
+  return `<polyline fill="none" stroke="var(--data-line)" stroke-width="2" vector-effect="non-scaling-stroke" points="${samples.map((s, k) => (k / n * W).toFixed(1) + ',' + (H - 2 - s[1] / max * (H - 4)).toFixed(1)).join(' ')}"/>`;
+}
+function renderHistory(){
+  const h = store.get('sessions', []);
+  const wk = Date.now() - 7 * 864e5, w = h.filter(s => s.start >= wk);
+  const sum = (a, f) => a.reduce((x, s) => x + (s[f] || 0), 0);
+  $('#totals').innerHTML = [
+    ['Séances (7 j)', w.length, ''], ['Distance (7 j)', fr2(sum(w, 'distance')), 'km'],
+    ['Temps (7 j)', hms(sum(w, 'duration')), ''], ['Calories (7 j)', Math.round(sum(w, 'kcal')), 'kcal']
+  ].map(([l, v, u]) => `<div class="total"><span class="label">${l}</span><div class="v num">${v}${u ? `<small style="font:700 13px var(--font-body);color:var(--muted);margin-left:var(--space-1)">${u}</small>` : ''}</div></div>`).join('');
+  $('#btnClearEx').hidden = !h.some(s => s.example);
+  $('#histList').innerHTML = h.length ? h.map(s => {
+    const d = new Date(s.start);
+    return `<div class="hrow" data-id="${s.id}">
+      <button type="button" class="when" data-a="open"><b>${(s.program || 'Séance libre').replace(/</g, '&lt;')}${s.example ? '<span class="tag">Exemple</span>' : ''}</b><span>${d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })} · ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · <u>Voir le bilan</u></span></button>
+      <div class="c"><small>Durée</small>${hms(s.duration)}</div>
+      <div class="c"><small>Distance</small>${fr2(s.distance)} km</div>
+      <div class="c"><small>Moy.</small>${fr1(s.avgSpeed)} km/h</div>
+      <div class="c"><small>Calories</small>${Math.round(s.kcal)} kcal</div>
+      <svg class="spark" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true">${sparkSVG(s.samples, 120, 32)}</svg>
+      <button class="iconbtn del" data-a="del" title="Supprimer la séance" aria-label="Supprimer la séance">${ICON.x}</button></div>`;
+  }).join('') : '<div class="empty">Aucune séance pour l\'instant. Chaque séance de plus de 20 secondes s\'enregistre ici à l\'arrêt du tapis.</div>';
+}
+
+/* ---------- Rendu séance ---------- */
+const LABEL = { off: 'Déconnecté', idle: "À l'arrêt", starting: 'Démarrage', running: 'En marche', paused: 'En pause', error: 'Erreur' };
+function renderPresets(){
+  const sp = [2, 2.5, 3, 3.5, 4, 5, 6, 8].filter(v => v >= S.limits.minS && v <= S.limits.maxS);
+  const ip = [0, 1, 2, 3, 5, 8, 10, 12].filter(v => v >= S.limits.minI && v <= S.limits.maxI);
+  $('#speedPresets').innerHTML = sp.map(v => `<button data-ps="${v}">${String(v).replace('.', ',')}<small>km/h</small></button>`).join('');
+  $('#incPresets').innerHTML = ip.map(v => `<button data-pi="${v}">${v}<small>%</small></button>`).join('');
+}
+function renderInfo(){ $('#devInfo').innerHTML = Object.entries(S.info).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('') || '<dt>État</dt><dd>Non connecté</dd>'; }
+function render(){
+  const chip = $('#connChip');
+  chip.className = 'chip ' + (S.mode === 'demo' ? 'warn' : S.mode ? 'ok' : '');
+  chip.textContent = S.mode === 'demo' ? 'Démo' : S.mode ? 'Connecté · ' + (S.mode === 'ftms' ? 'FTMS' : 'FitShow') : 'Déconnecté';
+  $('#btnConnect').textContent = S.mode && S.mode !== 'demo' ? 'Déconnecter' : 'Connecter le tapis';
+
+  const st = $('#vState'); st.className = 'state ' + S.status;
+  st.querySelector('span').textContent = S.status === 'starting' && S.countdown > 0 ? 'Départ dans ' + S.countdown : S.status === 'error' ? (S.errorMsg || 'Erreur') : boot && S.status === 'running' ? 'Mise en vitesse' : LABEL[S.status];
+  $('#vSpeed').textContent = fr1(S.speed);
+  $('#vTarget').textContent = S.mode ? 'Consigne ' + fr1(S.targetSpeed) + ' km/h · ' + S.targetIncline + ' %' : '';
+  const el = shown.elapsed(), di = shown.distance();
+  $('#vTime').textContent = hms(el);
+  $('#vDist').innerHTML = fr2(di) + '<small>km</small>';
+  $('#vInc').innerHTML = Math.round(S.incline) + '<small>%</small>';
+  $('#vKcal').innerHTML = Math.round(shown.kcal()) + '<small>kcal</small>';
+  if (S.speed > 0.5){ const p = 60 / S.speed; $('#vPace').innerHTML = Math.floor(p) + ':' + String(Math.round(p % 1 * 60) % 60).padStart(2, '0') + '<small>/km</small>'; } else $('#vPace').innerHTML = '–<small>/km</small>';
+  $('#vAvg').innerHTML = fr1(el ? di / (el / 3600) : 0) + '<small>km/h</small>';
+  $('#vSteps').textContent = S.m.steps ? S.m.steps.toLocaleString('fr-FR') : '–';
+  $('#vHr').innerHTML = (S.m.hr || '–') + '<small>bpm</small>';
+  $('#mSteps').hidden = !S.m.steps;
+  $('#mHr').hidden = !S.m.hr;
+  $('#cSpeed').textContent = fr1(S.targetSpeed) + ' km/h';
+  $('#cInc').textContent = S.targetIncline + ' %';
+  $$('#speedPresets button').forEach(b => { const on = +b.dataset.ps === S.targetSpeed; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  $$('#incPresets button').forEach(b => { const on = +b.dataset.pi === S.targetIncline; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+
+  const go = $('#btnStart');
+  go.textContent = S.status === 'running' ? 'Pause' : S.status === 'paused' ? 'Reprendre' : 'Démarrer';
+  go.className = S.status === 'running' ? 'pause' : 'go';
+  go.disabled = !driver || S.status === 'starting';
+  $('#btnStop').disabled = !driver || !['running', 'paused', 'starting'].includes(S.status);
+
+  // Bandeau programme
+  const pb = $('#progBanner');
+  if (prog){
+    pb.hidden = false; const tot = progDur(prog.p), seg = prog.p.segments[prog.seg] || prog.p.segments[0];
+    let acc = 0; for (let k = 0; k <= prog.seg; k++) acc += prog.p.segments[k].d;
+    $('#pbName').textContent = prog.p.name;
+    $('#pbMeta').textContent = 'Étape ' + (prog.seg + 1) + '/' + prog.p.segments.length + ' · reste ' + hms(tot - prog.t);
+    const nx = prog.p.segments[prog.seg + 1];
+    const adj = prog.manual && prog.manual.seg === prog.seg ? 'Étape ajustée sur le tapis (' + fr1(prog.manual.s) + ' km/h, ' + prog.manual.i + ' %). ' : '';
+    const startTxt = S.status === 'starting' ? 'Le tapis démarre' + (S.countdown > 0 ? ' dans ' + S.countdown + ' s' : '') + ' à ' + fr1(S.targetSpeed) + ' km/h, ' + S.targetIncline + ' %.'
+      : boot ? 'Mise en vitesse : ' + fr1(S.speed) + ' → ' + fr1(S.targetSpeed) + ' km/h. Ce temps ne compte pas dans le programme.' : '';
+    $('#pbNext').textContent = startTxt || adj + (nx ? 'Dans ' + hms(acc - prog.t) + ' : ' + fr1(nx.s) + ' km/h, ' + nx.i + ' %' : 'Dernière étape');
+    $('#pbProfile').innerHTML = profileSVG(prog.p.segments, 600, 64, prog.t);
+    const pc = Math.min(100, Math.round(prog.t / tot * 100)); $('#pbBar').style.width = pc + '%'; $('#pbXp').setAttribute('aria-valuenow', pc);
+  } else pb.hidden = true;
+
+  // Courbes en direct : vitesse et inclinaison sur deux graphiques, chacun sa propre échelle
+  const sm = session ? session.samples : [], n = Math.max(sm.length - 1, 60);
+  const curve = (sel, H, idx, max, ref) => {
+    const y = v => (H - 4 - v / max * (H - 10)).toFixed(1);
+    let out = `<line x1="0" x2="600" y1="${H / 2}" y2="${H / 2}" stroke="var(--edge)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+    if (ref != null) out += `<line x1="0" x2="600" y1="${y(ref)}" y2="${y(ref)}" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>`;
+    if (sm.length > 1) out += `<polyline points="${sm.map((s, k) => (k / n * 600).toFixed(1) + ',' + y(s[idx])).join(' ')}" fill="none" stroke="var(--data-line)" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+    $(sel).innerHTML = out;
+  };
+  curve('#liveChart', 84, 1, Math.max(4, S.targetSpeed, ...sm.map(s => s[1])) * 1.1, S.mode ? S.targetSpeed : null);
+  curve('#incChart', 56, 2, Math.max(5, ...sm.map(s => s[2])) * 1.1, null);
+  $('#chartEmpty').hidden = sm.length > 1;
+  if ($('#chartTable').open){
+    const rows = sm.filter((s, k) => s[0] % 60 === 0 || k === sm.length - 1);
+    $('#chartRows').innerHTML = rows.length ? `<table class="ctab"><thead><tr><th>Temps</th><th>Vitesse</th><th>Inclinaison</th></tr></thead><tbody>${rows.map(s => `<tr><td>${hms(s[0])}</td><td>${fr1(s[1])} km/h</td><td>${Math.round(s[2])} %</td></tr>`).join('')}</tbody></table>` : '<p class="ds-note">Pas encore de valeurs.</p>';
+  }
+}
+
+/* ---------- Horloge (1 s) ---------- */
+setInterval(() => {
+  if (S.status === 'running'){
+    S.loc.elapsed++; S.loc.distance += S.speed / 3600; S.loc.kcal += kcalPerMin(S.speed, S.incline) / 60;
+    if (session) session.samples.push([Math.round(shown.elapsed()), S.speed, S.incline, S.m.hr || 0]);
+    syncTick();
+    progTick();
+  } else if (S.status === 'starting' && boot && driver && S.mode !== 'demo') bootTick();
+  render();
+}, 1000);
+
+/* ---------- Verrou d'écran ---------- */
+let lock = null;
+async function wake(on){ try { if (on && !lock && navigator.wakeLock) lock = await navigator.wakeLock.request('screen'); if (!on && lock){ await lock.release(); lock = null; } } catch(e){ lock = null; } }
+
+/* ---------- Onglets ---------- */
+function selectTab(t){
+  $$('.tab').forEach(b => { if (b.dataset.tab === t) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  placeTabDisc();
+  ['seance', 'programmes', 'historique', 'reglages'].forEach(x => $('#tab-' + x).hidden = x !== t);
+  if (t === 'programmes') renderPrograms();
+  if (t === 'historique') renderHistory();
+  if (t === 'reglages'){ renderInfo(); renderLog(); }
+  try { sessionStorage.setItem('foulee.tab', t); } catch(e){}
+}
+$$('.tab').forEach(b => b.addEventListener('click', () => selectTab(b.dataset.tab)));
+// Le disque sauge se place sous l'onglet actif (--nx = centre de l'onglet, en px)
+function placeTabDisc(){
+  const tb = $('#tabbar'), b = tb.querySelector('[aria-current]'); if (!b) return;
+  const r = b.getBoundingClientRect(), p = tb.getBoundingClientRect();
+  tb.style.setProperty('--nx', (r.left - p.left + r.width / 2) + 'px');
+}
+window.addEventListener('resize', placeTabDisc);
+
+/* ---------- Événements ---------- */
+$('#btnConnect').addEventListener('click', () => { if (S.mode && S.mode !== 'demo'){ driver.disconnect(); } else connect(); });
+$('#btnDemo').addEventListener('click', startDemo);
+$('#btnStart').addEventListener('click', startPause);
+$('#btnStop').addEventListener('click', stopBelt);
+$('#chartTable').addEventListener('toggle', render);
+// Télécharger Foulée : dans claude.ai via la capacité « downloads » (la personne confirme), ailleurs via un lien classique
+let downloadsApi = null;
+(async () => { try { if (window.claude && claude.use) downloadsApi = await claude.use('downloads'); } catch(e){} })();
+async function pageSource(){
+  let html = '';
+  try { const r = await fetch(location.href, { cache: 'no-store' }); html = await r.text(); } catch(e){}
+  if (/FitShowDriver/.test(html) && /id="btnConnect"/.test(html)) return html;
+  // Repli : la page en l'état, sans les scripts ajoutés par le lecteur d'artefacts
+  const root = document.documentElement.cloneNode(true);
+  root.querySelectorAll('script:not(#app)').forEach(x => x.remove());
+  const t = root.querySelector('#toast'); if (t){ t.hidden = true; t.innerHTML = ''; }
+  return '<!doctype html>\n' + root.outerHTML;
+}
+// Enregistre un fichier : capacité « downloads » dans claude.ai (la personne confirme), lien classique ailleurs
+async function saveFile(filename, data, type, doneMsg){
+  try {
+    if (downloadsApi) await downloadsApi.save({ filename, data });
+    else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([data], { type })); a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    }
+    toast(doneMsg);
+  } catch(err){
+    if (err && err.code === 'declined') return;
+    toast(err && err.code === 'rate_limited' ? 'Une demande est déjà ouverte : réessaie dans un instant' : 'Enregistrement impossible ici');
+  }
+}
+$('#btnDownload').addEventListener('click', async e => {
+  const btn = e.currentTarget; btn.disabled = true;
+  try { await saveFile('foulee.html', await pageSource(), 'text/html', 'Foulée enregistrée : foulee.html'); } finally { btn.disabled = false; }
+});
+// Le bloc « Utiliser le Bluetooth » ne sert que dans claude.ai
+if (window.top === window.self) $('#btSection').hidden = true;
+
+/* ---------- Export / import des données ---------- */
+const plural = (n, w) => n + ' ' + w + (n > 1 ? 's' : '');
+$('#btnExport').addEventListener('click', () => {
+  const data = { app: 'Foulée', version: 1, exported: new Date().toISOString(), settings, programs, sessions: store.get('sessions', []) };
+  const day = new Date().toLocaleDateString('fr-CA');
+  saveFile('foulee-donnees-' + day + '.json', JSON.stringify(data, null, 1), 'application/json', 'Données exportées : ' + plural(data.sessions.length, 'séance') + ', ' + plural(programs.length, 'programme'));
+});
+$('#lblImport').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); $('#fileImport').click(); } });
+$('#fileImport').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
+  let d; try { d = JSON.parse(await f.text()); } catch(err){ toast('Ce fichier n\'est pas un export de Foulée'); return; }
+  if (!d || d.app !== 'Foulée' || !Array.isArray(d.sessions) || !Array.isArray(d.programs)){ toast('Ce fichier n\'est pas un export de Foulée'); return; }
+  // Séances : ajout de celles qui manquent (même id = même séance), les exemples en moins
+  const h = store.get('sessions', []), have = new Set(h.map(x => x.id));
+  const newS = d.sessions.filter(x => x && x.id && !have.has(x.id) && !x.example);
+  h.push(...newS); h.sort((a, z) => z.start - a.start); store.set('sessions', h.slice(0, 200));
+  // Programmes : ajout de ceux qui manquent ; un programme du même id mais modifié arrive en copie
+  let newP = 0;
+  d.programs.forEach(x => {
+    if (!x || !x.id || !Array.isArray(x.segments)) return;
+    const cur = programs.find(y => y.id === x.id);
+    if (!cur){ programs.push(x); newP++; }
+    else if (JSON.stringify(cur) !== JSON.stringify(x)){ programs.push({ ...x, id: 'p' + Date.now() + newP, name: x.name + ' (importé)' }); newP++; }
+  });
+  saveProgs();
+  if (d.settings){ Object.assign(settings, d.settings); saveSettings(); $('#setWeight').value = settings.weight; $('#setKcal').value = settings.kcal; $('#setStartSpeed').value = settings.startSpeed; $('#setScan').value = settings.scan; }
+  renderHistory(); renderPrograms();
+  log('', 'Import : ' + plural(newS.length, 'séance') + ', ' + plural(newP, 'programme') + ' ajoutés');
+  toast(newS.length || newP ? 'Import terminé : ' + plural(newS.length, 'séance') + ' et ' + plural(newP, 'programme') + ' en plus' : 'Import terminé : tout était déjà là');
+});
+$('#pbQuit').addEventListener('click', () => { prog = null; render(); });
+document.querySelector('.controls').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.ds) setTarget(S.targetSpeed + +b.dataset.ds, S.targetIncline);
+  if (b.dataset.di) setTarget(S.targetSpeed, S.targetIncline + +b.dataset.di);
+  if (b.dataset.ps) setTarget(+b.dataset.ps, S.targetIncline);
+  if (b.dataset.pi) setTarget(S.targetSpeed, +b.dataset.pi);
+});
+document.addEventListener('keydown', e => {
+  if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || $('#tab-seance').hidden) return;
+  if (e.key === ' '){ e.preventDefault(); startPause(); }
+  if (e.key === 'ArrowUp'){ e.preventDefault(); setTarget(S.targetSpeed + .5, S.targetIncline); }
+  if (e.key === 'ArrowDown'){ e.preventDefault(); setTarget(S.targetSpeed - .5, S.targetIncline); }
+  if (e.key === 'ArrowRight'){ e.preventDefault(); setTarget(S.targetSpeed, S.targetIncline + 1); }
+  if (e.key === 'ArrowLeft'){ e.preventDefault(); setTarget(S.targetSpeed, S.targetIncline - 1); }
+});
+
+// Double clic de confirmation pour les suppressions
+function confirmBtn(b, go){
+  if (b.dataset.armed){ go(); return; }
+  const old = b.innerHTML; b.dataset.armed = '1'; b.textContent = b.classList.contains('iconbtn') ? 'Sûr ?' : 'Confirmer';
+  setTimeout(() => { if (b.isConnected){ delete b.dataset.armed; b.innerHTML = old; } }, 3000);
+}
+$('#progList').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return; const id = b.closest('.pcard').dataset.id, p = programs.find(x => x.id === id);
+  if (b.dataset.a === 'run') launchProgram(id);
+  if (b.dataset.a === 'edit') openEditor(p);
+  if (b.dataset.a === 'copy'){ programs.push({ ...JSON.parse(JSON.stringify(p)), id: 'p' + Date.now(), name: p.name + ' (copie)' }); saveProgs(); renderPrograms(); }
+  if (b.dataset.a === 'del') confirmBtn(b, () => {
+    const at = programs.findIndex(x => x.id === id), gone = programs[at];
+    programs = programs.filter(x => x.id !== id); saveProgs(); renderPrograms();
+    toast('Programme supprimé', () => { programs.splice(Math.min(at, programs.length), 0, gone); saveProgs(); renderPrograms(); });
+  });
+});
+$('#btnNewProg').addEventListener('click', () => openEditor(null));
+$('#editor').addEventListener('input', e => {
+  const i = e.target; if (i.id === 'edName'){ editing.name = i.value; return; }
+  const tr = i.closest('[data-k]'); if (!tr || !i.dataset.f) return; const s = editing.segments[+tr.dataset.k], v = parseFloat(i.value);
+  if (isNaN(v)) return; if (i.dataset.f === 'd') s.d = Math.max(15, Math.round(v * 60)); else s[i.dataset.f] = v;
+  edSum();
+});
+$('#editor').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.id === 'edAdd'){ const l = editing.segments[editing.segments.length - 1] || { d: 300, s: 3, i: 0 }; editing.segments.push({ ...l }); renderEditor(); }
+  if (b.id === 'edAdd2'){ for (let k = 0; k < 3; k++) editing.segments.push({ d: 60, s: 3.5, i: 0 }, { d: 60, s: 2.5, i: 0 }); renderEditor(); }
+  if (b.id === 'edCancel'){ editing = null; renderEditor(); }
+  if (b.id === 'edSave'){
+    editing.segments = editing.segments.map(s => ({ d: s.d, s: clamp(+s.s || 1, 0.5, 25), i: clamp(Math.round(+s.i || 0), -5, 25) }));
+    if (!editing.segments.length) return;
+    const isNew = editing.isNew; delete editing.isNew; editing.name = editing.name.trim() || 'Programme sans nom';
+    if (isNew) programs.push(editing); else programs = programs.map(p => p.id === editing.id ? editing : p);
+    saveProgs(); editing = null; renderEditor(); renderPrograms();
+  }
+  const tr = b.closest('[data-k]');
+  if (tr && b.dataset.a === 'del' && editing.segments.length > 1){ editing.segments.splice(+tr.dataset.k, 1); renderEditor(); }
+  if (tr && b.dataset.a === 'dup'){ editing.segments.splice(+tr.dataset.k + 1, 0, { ...editing.segments[+tr.dataset.k] }); renderEditor(); }
+});
+$('#histList').addEventListener('click', e => {
+  const o = e.target.closest('[data-a="open"]');
+  if (o){ const s = store.get('sessions', []).find(x => x.id === +o.closest('.hrow').dataset.id); if (s) showSummary(s, false); return; }
+  const b = e.target.closest('button[data-a="del"]'); if (!b) return; const id = +b.closest('.hrow').dataset.id;
+  confirmBtn(b, () => {
+    const all = store.get('sessions', []), gone = all.find(s => s.id === id);
+    store.set('sessions', all.filter(s => s.id !== id)); renderHistory();
+    if (gone) toast('Séance supprimée', () => { const h = store.get('sessions', []); h.push(gone); h.sort((a, z) => z.start - a.start); store.set('sessions', h); renderHistory(); });
+  });
+});
+$('#btnClearEx').addEventListener('click', () => { store.set('sessions', store.get('sessions', []).filter(s => !s.example)); renderHistory(); });
+async function copy(text, btn){ const o = btn.textContent; try { await navigator.clipboard.writeText(text); btn.textContent = 'Copié'; } catch(e){ btn.textContent = 'Copie refusée'; } setTimeout(() => btn.textContent = o, 1600); }
+$('#btnCopyHist').addEventListener('click', e => copy(JSON.stringify(store.get('sessions', []), null, 1), e.currentTarget));
+$('#btnCopyLog').addEventListener('click', e => copy(logLines.map(l => l.text).join('\n'), e.currentTarget));
+$('#setWeight').value = settings.weight; $('#setKcal').value = settings.kcal; $('#setStartSpeed').value = settings.startSpeed; $('#setScan').value = settings.scan;
+$('#setScan').addEventListener('change', e => { settings.scan = e.target.value; saveSettings(); log('', 'Recherche : ' + (settings.scan === 'all' ? 'tous les appareils' : 'filtrée')); });
+$('#setWeight').addEventListener('change', e => { settings.weight = clamp(+e.target.value || 75, 30, 200); saveSettings(); });
+$('#setKcal').addEventListener('change', e => { settings.kcal = e.target.value; saveSettings(); render(); });
+$('#setStartSpeed').addEventListener('change', e => { settings.startSpeed = clamp(+e.target.value || 2.5, 0.5, 20); saveSettings(); if (S.status !== 'running') setTarget(settings.startSpeed, S.targetIncline); });
+
+/* ---------- Démarrage ---------- */
+$('#today').textContent = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+seedHistory(); renderPresets(); renderInfo(); render();
+let t0 = 'seance'; try { t0 = sessionStorage.getItem('foulee.tab') || 'seance'; } catch(e){}
+selectTab(t0);
+diag();
+})();
+</script>
+
+</body></html>
