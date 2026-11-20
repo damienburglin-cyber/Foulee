@@ -1014,7 +1014,9 @@ const ADDED = [
     {d:90,s:3.5,i:2},{d:90,s:3.5,i:3},{d:90,s:3,i:1},{d:150,s:2.5,i:0}] },
   { id: 'p5', name: 'Coteaux 15 min', segments: [
     {d:120,s:3,i:0},{d:90,s:3.5,i:1},{d:90,s:3.5,i:2},{d:90,s:4,i:2},{d:90,s:3.5,i:3},
-    {d:90,s:4,i:0},{d:90,s:4,i:3},{d:90,s:3.5,i:1},{d:150,s:3,i:0}] }
+    {d:90,s:4,i:0},{d:90,s:4,i:3},{d:90,s:3.5,i:1},{d:150,s:3,i:0}] },
+  { id: 'p6', name: 'Décrassage 12 min', segments: [
+    {d:120,s:2,i:0},{d:120,s:2.3,i:0},{d:180,s:2.6,i:0},{d:120,s:3,i:0},{d:90,s:2.5,i:0},{d:90,s:2,i:0}] }
 ];
 ADDED.forEach(p => {
   if (store.get('added.' + p.id, false)) return;
