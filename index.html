@@ -365,6 +365,9 @@ dialog.sheet::backdrop{background:rgba(46,42,36,.38)}
         <div class="field"><label class="label" for="setScan">Recherche du tapis</label>
           <select id="setScan"><option value="filtered">Tapis FitShow et FTMS seulement</option><option value="all">Tous les appareils Bluetooth</option></select>
           <span class="hint">Si le tapis n'apparaît pas, passe sur « Tous les appareils » et cherche son nom dans la liste.</span></div>
+        <div class="field"><label class="label" for="setAuto">Connexion à l'ouverture</label>
+          <select id="setAuto"><option value="on">Automatique (tapis déjà connecté une fois)</option><option value="off">Manuelle, avec le bouton</option></select>
+          <span class="hint">Il faut s'être connecté une fois avec le bouton. Le tapis doit être allumé et FitShow fermée.</span></div>
         <h2 style="margin-top:6px">Tapis</h2>
         <dl class="dl" id="devInfo"></dl>
         <div id="btSection" style="display:flex;flex-direction:column;gap:var(--space-4)">
@@ -438,7 +441,7 @@ const ICON = {
 };
 
 /* ---------- Réglages ---------- */
-const settings = Object.assign({ weight: 75, kcal: 'machine10', startSpeed: 2.5, scan: 'filtered' }, store.get('settings', {}));
+const settings = Object.assign({ weight: 75, kcal: 'machine10', startSpeed: 2.5, scan: 'filtered', autoConnect: true }, store.get('settings', {}));
 const saveSettings = () => store.set('settings', settings);
 
 /* ---------- État ---------- */
@@ -696,8 +699,14 @@ async function connect(){
     const opts = { optionalServices: [0xfff0, 0xffe0, 0x1826, 0x180a] };
     if (all) opts.acceptAllDevices = true; else opts.filters = [{ namePrefix: 'FS-' }, { services: [0xfff0] }, { services: [0x1826] }];
     const device = await navigator.bluetooth.requestDevice(opts);
-    $('#devName').textContent = device.name || 'Tapis';
     log('', 'Appareil choisi : ' + (device.name || '(sans nom)') + ' · id ' + device.id);
+    await connectDevice(device);
+  } catch(e){ connectError(e); }
+}
+// Connexion à un appareil déjà choisi : sert au bouton et à la connexion automatique
+async function connectDevice(device){
+    $('#devName').textContent = device.name || 'Tapis';
+    store.set('lastDevice', { id: device.id, name: device.name || '' });
     log('', 'Connexion GATT…');
     device.addEventListener('gattserverdisconnected', () => { log('err', 'Tapis déconnecté'); if (S.status === 'running') finishSession(); driver = null; S.mode = null; setStatus('off'); });
     const server = await device.gatt.connect();
@@ -724,7 +733,8 @@ async function connect(){
     await driver.init();
     log('', 'Prêt, protocole ' + driver.name);
     render();
-  } catch(e){
+}
+function connectError(e){
     log('err', 'Échec : ' + e.name + ' : ' + e.message);
     if (e.name === 'NotFoundError') {
       if (/cancel/i.test(e.message)) { log('', 'Sélecteur fermé sans choisir d\'appareil'); return; }
@@ -733,7 +743,36 @@ async function connect(){
     }
     if (e.name === 'SecurityError' || /permission|policy|allowed/i.test(e.message)) { notice(noBtMessage(), true); return; }
     notice('<div><b>Connexion impossible.</b> ' + e.message + '. Vérifie que le tapis est allumé et qu\'aucune autre app (FitShow) n\'y est connectée. Détail dans Réglages, journal Bluetooth.</div>', true);
+}
+// Au chargement : reconnexion au tapis déjà autorisé, sans passer par le sélecteur (Chrome n'ouvre le sélecteur que sur un geste).
+// Demande navigator.bluetooth.getDevices() ; sinon le journal le dit et le bouton reste nécessaire.
+async function autoConnect(){
+  if (settings.autoConnect === false || driver) return;
+  if (!navigator.bluetooth) return;
+  if (!navigator.bluetooth.getDevices){ log('', 'Connexion auto : ce navigateur ne la permet pas (getDevices absent). Touche « Connecter le tapis ».'); return; }
+  let devs = [];
+  try { devs = await navigator.bluetooth.getDevices(); }
+  catch(e){ log('err', 'Connexion auto : ' + e.name + ' : ' + e.message); return; }
+  const last = store.get('lastDevice', null);
+  log('', 'Connexion auto : ' + devs.length + ' appareil' + (devs.length > 1 ? 's' : '') + ' déjà autorisé' + (devs.length > 1 ? 's' : '') + (devs.length ? ' (' + devs.map(d => d.name || d.id).join(', ') + ')' : ''));
+  const dev = devs.find(d => last && d.id === last.id) || devs.find(d => /^FS-/.test(d.name || '')) || (devs.length === 1 ? devs[0] : null);
+  if (!dev){ log('', 'Connexion auto : aucun tapis déjà autorisé. Connecte-toi une fois avec le bouton, ensuite ce sera automatique.'); return; }
+  $('#devName').textContent = (dev.name || 'Tapis') + ' · recherche…';
+  // Chrome demande souvent d'avoir « vu » l'appareil depuis l'ouverture de la page avant de s'y connecter
+  if (dev.watchAdvertisements){
+    const seen = await new Promise(res => {
+      const ctl = new AbortController(), t = setTimeout(() => { ctl.abort(); res(false); }, 10000);
+      dev.addEventListener('advertisementreceived', () => { clearTimeout(t); ctl.abort(); res(true); }, { once: true });
+      dev.watchAdvertisements({ signal: ctl.signal }).catch(e => { log('', 'Connexion auto : écoute des annonces impossible (' + e.name + ')'); clearTimeout(t); res(null); });
+    });
+    log('', seen ? 'Connexion auto : tapis détecté à proximité' : seen === false ? 'Connexion auto : pas d\'annonce du tapis en 10 s (éteint ou déjà connecté ailleurs ?), essai quand même' : 'Connexion auto : essai direct');
   }
+  for (let i = 1; i <= 3 && !driver; i++){
+    try { log('', 'Connexion auto à ' + (dev.name || dev.id) + ', essai ' + i + '/3'); await connectDevice(dev); }
+    catch(e){ log('err', 'Connexion auto, essai ' + i + ' : ' + e.name + ' : ' + e.message); if (i < 3) await sleep(2500); }
+  }
+  if (driver) toast('Tapis connecté automatiquement');
+  else { $('#devName').textContent = dev.name || 'Tapis'; log('', 'Connexion auto abandonnée : touche « Connecter le tapis »'); }
 }
 async function startDemo(){
   if (driver) driver.disconnect();
@@ -1314,6 +1353,8 @@ async function copy(text, btn){ const o = btn.textContent; try { await navigator
 $('#btnCopyHist').addEventListener('click', e => copy(JSON.stringify(store.get('sessions', []), null, 1), e.currentTarget));
 $('#btnCopyLog').addEventListener('click', e => copy(logLines.map(l => l.text).join('\n'), e.currentTarget));
 $('#setWeight').value = settings.weight; $('#setKcal').value = settings.kcal; $('#setStartSpeed').value = settings.startSpeed; $('#setScan').value = settings.scan;
+$('#setAuto').value = settings.autoConnect === false ? 'off' : 'on';
+$('#setAuto').addEventListener('change', e => { settings.autoConnect = e.target.value === 'on'; saveSettings(); log('', 'Connexion à l\'ouverture : ' + (settings.autoConnect ? 'automatique' : 'manuelle')); });
 $('#setScan').addEventListener('change', e => { settings.scan = e.target.value; saveSettings(); log('', 'Recherche : ' + (settings.scan === 'all' ? 'tous les appareils' : 'filtrée')); });
 $('#setWeight').addEventListener('change', e => { settings.weight = clamp(+e.target.value || 75, 30, 200); saveSettings(); });
 $('#setKcal').addEventListener('change', e => { settings.kcal = e.target.value; saveSettings(); render(); });
@@ -1324,7 +1365,7 @@ $('#today').textContent = new Date().toLocaleDateString('fr-FR', { weekday: 'lon
 seedHistory(); renderPresets(); renderInfo(); render();
 let t0 = 'seance'; try { t0 = sessionStorage.getItem('foulee.tab') || 'seance'; } catch(e){}
 selectTab(t0);
-diag();
+diag().then(autoConnect);
 })();
 </script>
 
