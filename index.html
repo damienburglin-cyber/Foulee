@@ -621,10 +621,11 @@ function FTMSDriver(server, svc, data, cp, st){
     if (k !== lastFtms){ lastFtms = k; log('rx', 'Mesure reçue : vitesse ' + fr1(S.speed) + ' km/h · pente ' + S.incline + ' %'); }
     if (S.speed > 0 && (S.status === 'idle' || S.status === 'starting')) setStatus('running');
     render();
+    if (boot && S.status === 'running') bootTick();
   });
   if (st) st.addEventListener('characteristicvaluechanged', e => {
     const v = new Uint8Array(e.target.value.buffer); log('rx', 'statut ' + hex(v));
-    if (v[0] === 0x04) setStatus('running');
+    if (v[0] === 0x04){ if (S.status === 'running') beltStartSignal(); else setStatus('running'); }
     if (v[0] === 0x02) setStatus(v[1] === 2 ? 'paused' : 'idle');
     if (v[0] === 0x01) setStatus('idle');
   });
@@ -923,7 +924,7 @@ let boot = null;
 function startBoot(){
   if (!driver) return;
   if (S.mode === 'demo'){ sync.tries = 0; sendTarget(); return; }
-  boot = { moveAt: null, lastSend: 0, sends: 0 };
+  boot = { moveAt: null, lastSend: 0, sends: 0, okSince: null, start04: Date.now(), t0: Date.now(), prevDiff: null };
   sync.pending = false;
   log('', 'Démarrage à ' + fr1(S.targetSpeed) + ' km/h, ' + S.targetIncline + ' % : consigne envoyée dès maintenant, puis chaque seconde');
   bootSend(S.status === 'starting' ? 'pendant le compte à rebours' : 'au démarrage');
@@ -934,24 +935,35 @@ function bootSend(when){
   log('', 'Vitesse de départ ' + fr1(S.targetSpeed) + ' km/h envoyée ' + when + ' (' + boot.sends + ')');
 }
 function bootTick(){
-  // Pendant le compte à rebours : on renvoie chaque seconde, pour que le tapis parte directement à la bonne vitesse s'il l'accepte
-  if (S.status === 'starting'){ if (Date.now() - boot.lastSend >= 1000) bootSend('pendant le compte à rebours'); return; }
-  if (S.speed <= 0) return;
   const now = Date.now();
-  if (!boot.moveAt){ boot.moveAt = now; log('', 'Le tapis roule à ' + fr1(S.speed) + ' km/h'); }
+  // Pendant le compte à rebours : on renvoie chaque seconde, pour que le tapis parte directement à la bonne vitesse s'il l'accepte
+  if (S.status === 'starting'){ if (now - boot.lastSend >= 1000) bootSend('pendant le compte à rebours'); return; }
+  if (S.speed <= 0) return;
+  if (!boot.moveAt){ boot.moveAt = now; log('', 'Le tapis annonce ' + fr1(S.speed) + ' km/h'); }
   const offS = Math.abs(S.speed - S.targetSpeed) > 0.05, offI = Math.abs(S.incline - S.targetIncline) > 0.5;
-  const moved = S.speed !== sync.lastS || S.incline !== sync.lastI;
-  sync.lastS = S.speed; sync.lastI = S.incline;
+  const diff = Math.abs(S.speed - S.targetSpeed), closing = boot.prevDiff != null && diff < boot.prevDiff - 0.01;
+  boot.prevDiff = diff; sync.lastS = S.speed; sync.lastI = S.incline;
   if (!offS && !offI){
-    log('', 'Vitesse de départ atteinte : ' + fr1(S.speed) + ' km/h, ' + Math.round(S.incline) + ' %' + (now - boot.moveAt < 1500 ? ' dès le départ' : ' après ' + Math.round((now - boot.moveAt) / 1000) + ' s') + (prog ? '. Le programme démarre.' : ''));
+    // Ton tapis annonce la consigne pendant son compte à rebours puis repart à sa vitesse mini au vrai départ :
+    // on ne valide qu'après 3 s stables, et au moins 4,5 s après son dernier signal de démarrage.
+    if (!boot.okSince) boot.okSince = now;
+    if (now - boot.okSince < 3000 || now - boot.start04 < 4500) return;
+    log('', 'Vitesse de départ tenue : ' + fr1(S.speed) + ' km/h, ' + Math.round(S.incline) + ' %, ' + Math.round((now - boot.t0) / 1000) + ' s après l\'ordre de départ' + (prog ? '. Le programme démarre.' : ''));
     boot = null; sync.pending = false; sync.tries = 0; return;
   }
+  if (boot.okSince){ log('', 'Le tapis est retombé à ' + fr1(S.speed) + ' km/h (départ réel de la bande) : consigne renvoyée'); boot.okSince = null; boot.lastSend = 0; }
   if (now - boot.moveAt > 30000){
     log('err', 'Le tapis n\'a pas pris la vitesse de départ en 30 s : l\'appli s\'aligne sur lui');
     boot = null; adoptFromBelt(); return;
   }
-  if (moved && S.speed > 0 && now - boot.lastSend < 3000) return;   // il accélère vers la consigne
-  if (now - boot.lastSend >= 1000) bootSend('au démarrage');
+  if (closing && now - boot.lastSend < 3000) return;   // il accélère vers la consigne
+  if (now - boot.lastSend >= 700) bootSend('au démarrage');
+}
+// Signal de (re)démarrage envoyé par le tapis (FTMS « statut 04 »), y compris le 2e, au vrai départ de la bande
+function beltStartSignal(){
+  if (!driver || S.mode === 'demo') return;
+  if (boot){ boot.start04 = Date.now(); boot.okSince = null; log('', 'Le tapis signale le départ de la bande'); bootTick(); }
+  else { startBoot(); log('', 'Le tapis signale un redémarrage : consigne renvoyée'); }
 }
 function sendTarget(){
   if (!driver) return;
