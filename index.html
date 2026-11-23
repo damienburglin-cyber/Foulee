@@ -817,6 +817,11 @@ async function diag(){
     catch(e){ log('err', 'Diag · getAvailability : ' + e.name + ' : ' + e.message); }
   }
   try { const st = await navigator.permissions.query({ name: 'bluetooth' }); log('', 'Diag · permission Bluetooth : ' + st.state); } catch(e){}
+  // Navigateur intégré de l'appli Claude ou Chrome : les données sont-elles les mêmes ?
+  let mark = null; try { mark = localStorage.getItem('foulee.storeMark'); if (!mark){ mark = 'créé le ' + new Date().toLocaleString('fr-FR'); localStorage.setItem('foulee.storeMark', mark); } } catch(e){ mark = 'stockage inaccessible'; }
+  try {
+  log('', 'Diag · stockage : ' + store.get('sessions', []).filter(x => !x.example).length + ' séances, ' + programs.length + ' programmes, repère ' + mark + ' · ouvert depuis : ' + (document.referrer ? new URL(document.referrer).host : 'aucune page') + (window.matchMedia && matchMedia('(display-mode: standalone)').matches ? ' · appli installée' : ' · onglet') + ' · version ' + APP_VERSION);
+  } catch(e){ log('err', 'Diag · stockage : ' + e.message); }
 }
 
 // Tentative de connexion en cours (bouton ou auto) : une seule à la fois, annulable
@@ -1020,13 +1025,18 @@ function finishSession(){
   const el = shown.elapsed();
   if (el >= 20){
     const st = sessionStats(session.samples);
+    if (session.plan){
+      const per = session.plan.map((_, k) => session.samples.filter(x => x[4] === k).length), done = per.filter(n => n > 0).length;
+      const bootS = session.samples.findIndex(x => x[4] >= 0);
+      log('', 'Bilan programme : ' + done + '/' + session.plan.length + ' étapes faites' + (prog && prog.t >= progDur(prog.p) - 1 ? ', programme terminé' : ', arrêté avant la fin') + ' · secondes par étape ' + per.join('/') + ' (prévu ' + session.plan.map(x => x.d).join('/') + ')' + (bootS > 0 ? ' · mise en vitesse ' + bootS + ' s' : '') + ' · ' + (session.adjust || []).length + ' réglage(s) manuel(s)');
+    }
     const s = { id: session.id, start: session.start, end: Date.now(), program: session.program, duration: el, distance: shown.distance(), kcal: shown.kcal(),
-      pid: session.pid || null, plan: session.plan || null,
+      pid: session.pid || null, plan: session.plan || null, adjust: session.adjust || [],
       maxSpeed: st.maxSpeed, avgIncline: st.avgIncline, maxIncline: st.maxIncline, elevation: st.elevation,
       steps: S.m.steps || null, hrAvg: st.hrAvg, hrMax: st.hrMax, source: S.mode,
       samples: session.samples.filter((_, i) => i % 10 === 0) };
     s.avgSpeed = el ? s.distance / (el / 3600) : 0;
-    const diagLines = logLines.filter(l => /Diag ·/.test(l.text)).slice(-6);
+    const diagLines = logLines.filter(l => /Diag ·/.test(l.text)).slice(-10);
     s.log = [...diagLines, ...logLines.filter(l => l.ts >= session.start - 30000 && !diagLines.includes(l))].slice(-400).map(l => l.text);
     const h = store.get('sessions', []); h.unshift(s);
     h.forEach((x, k) => { if (k >= 5) delete x.log; });
@@ -1119,7 +1129,7 @@ function sessionPayload(s){
     duree: Math.round(s.duration), distance: Math.round(s.distance * 1000) / 1000, kcal: Math.round(s.kcal || 0),
     vitesseMoy: r1(s.avgSpeed), vitesseMax: r1(g('maxSpeed')), penteMoy: r1(g('avgIncline')), penteMax: r1(g('maxIncline')),
     denivele: g('elevation') != null ? Math.round(g('elevation')) : null, pas: s.steps || null, fcMoy: g('hrAvg') || null, fcMax: g('hrMax') || null,
-    source: s.source || null, releve: (s.samples || []).map(x => [x[0], r1(x[1]), r1(x[2]), x[3] || 0, x[4] != null ? x[4] : -1]) };
+    source: s.source || null, ajustements: s.adjust || [], releve: (s.samples || []).map(x => [x[0], r1(x[1]), r1(x[2]), x[3] || 0, x[4] != null ? x[4] : -1]) };
 }
 let sumCur = null;
 async function sendToRdv(){
@@ -1130,7 +1140,7 @@ async function sendToRdv(){
   try { await navigator.clipboard.writeText(code); copied = true; } catch(e){}
   $('#sumSendMsg').textContent = copied ? 'Code copié. Dans Route des Vins, touche « Importer ma séance Foulée ».' : 'Copie automatique refusée : sélectionne le code ci-dessous et copie-le, puis colle-le dans Route des Vins.';
   log('', 'Séance envoyée à Route des Vins : code de ' + code.length + ' caractères' + (copied ? ', copié' : ', copie refusée'));
-  if (copied) window.open(RDV_URL, '_blank', 'noopener');
+  if (copied){ let w = null; try { w = window.open(RDV_URL, '_blank'); } catch(e){} log(w ? '' : 'err', 'Ouverture de Route des Vins : ' + (w ? 'demandée' : 'bloquée par le navigateur')); }
   else { $('#sumCode').focus(); $('#sumCode').select(); }
 }
 
@@ -1262,9 +1272,10 @@ function sendTarget(){
   driver.setTarget(S.targetSpeed, S.targetIncline);
   sync.pending = true; sync.t = Date.now(); sync.tries++;
 }
-function setTarget(sp, inc){
+function setTarget(sp, inc, src){
   S.targetSpeed = clamp(Math.round(sp * 10) / 10, S.limits.minS, S.limits.maxS);
   S.targetIncline = clamp(Math.round(inc / incStep()) * incStep(), S.limits.minI, S.limits.maxI);
+  if (src) noteAdjust('appli (' + src + ')');
   sync.pending = true; sync.t = Date.now(); sync.tries = 0;
   render();
   clearTimeout(tDeb);
@@ -1290,11 +1301,18 @@ function syncTick(){
   }
   adoptFromBelt();
 }
+// Réglage fait à la main pendant une séance : journal + liste gardée dans la séance [t, étape, vitesse, pente, origine]
+function noteAdjust(origin){
+  const step = prog && !boot ? prog.seg : -1, pl = prog && step >= 0 ? prog.p.segments[step] : null;
+  log('', 'Réglage manuel (' + origin + ') : ' + fr1(S.targetSpeed) + ' km/h, ' + S.targetIncline + ' %' + (pl ? ' · étape ' + (step + 1) + ' prévue à ' + fr1(pl.s) + ' km/h, ' + pl.i + ' %' : '') + (session ? ' · à ' + hms(shown.elapsed()) : ' · hors séance'));
+  if (session) (session.adjust = session.adjust || []).push([Math.round(shown.elapsed()), step, S.targetSpeed, S.targetIncline, origin === 'tapis' ? 'tapis' : 'appli']);
+}
 function adoptFromBelt(){
   const sp = Math.round(S.speed * 10) / 10, inc = Math.round(S.incline / incStep()) * incStep();
   if (sp === S.targetSpeed && inc === S.targetIncline) return;
   log('', 'Changé sur le tapis : ' + fr1(sp) + ' km/h, ' + inc + ' %');
   S.targetSpeed = sp; S.targetIncline = inc;
+  noteAdjust('tapis');
   if (prog && prog.seg >= 0) prog.manual = { seg: prog.seg, s: sp, i: inc };
 }
 function startPause(){
@@ -1373,7 +1391,7 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '23/11/2026 11:55';
+const APP_VERSION = '23/11/2026 12:25';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 
@@ -1606,7 +1624,17 @@ setInterval(() => {
 
 /* ---------- Verrou d'écran ---------- */
 let lock = null;
-async function wake(on){ try { if (on && !lock && navigator.wakeLock) lock = await navigator.wakeLock.request('screen'); if (!on && lock){ await lock.release(); lock = null; } } catch(e){ lock = null; } }
+async function wake(on){
+  try {
+    if (on && !lock){ if (!navigator.wakeLock){ log('err', 'Écran : maintien allumé indisponible ici'); return; } lock = await navigator.wakeLock.request('screen'); log('', 'Écran : maintenu allumé pendant la séance'); lock.addEventListener('release', () => { if (lock) log('', 'Écran : maintien relâché par le système'); }); }
+    if (!on && lock){ const l = lock; lock = null; await l.release(); }
+  } catch(e){ lock = null; log('err', 'Écran : maintien refusé (' + e.name + ')'); }
+}
+// Page cachée (écran verrouillé, autre appli) : le Bluetooth peut couper, on le trace ; au retour, on redemande l'écran allumé
+document.addEventListener('visibilitychange', () => {
+  log(document.hidden ? 'err' : '', 'Page ' + (document.hidden ? 'cachée (écran verrouillé ou autre appli)' : 'de nouveau visible') + ' · tapis ' + (driver && S.mode !== 'demo' ? 'connecté' : 'non connecté') + ' · ' + (LABEL[S.status] || S.status));
+  if (!document.hidden && S.status === 'running'){ lock = null; wake(true); }
+});
 
 /* ---------- Onglets ---------- */
 function selectTab(t){
@@ -1708,15 +1736,15 @@ $('#bStart').addEventListener('click', startPause);
 $('#bStop').addEventListener('click', stopBelt);
 $('#bigRun').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.dataset.bs) setTarget(S.targetSpeed + +b.dataset.bs, S.targetIncline);
-  if (b.dataset.bi) setTarget(S.targetSpeed, S.targetIncline + +b.dataset.bi * incStep());
+  if (b.dataset.bs) setTarget(S.targetSpeed + +b.dataset.bs, S.targetIncline, 'grand écran');
+  if (b.dataset.bi) setTarget(S.targetSpeed, S.targetIncline + +b.dataset.bi * incStep(), 'grand écran');
 });
 document.querySelector('.controls').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.dataset.ds) setTarget(S.targetSpeed + +b.dataset.ds, S.targetIncline);
-  if (b.dataset.di) setTarget(S.targetSpeed, S.targetIncline + +b.dataset.di);
-  if (b.dataset.ps) setTarget(+b.dataset.ps, S.targetIncline);
-  if (b.dataset.pi) setTarget(S.targetSpeed, +b.dataset.pi);
+  if (b.dataset.ds) setTarget(S.targetSpeed + +b.dataset.ds, S.targetIncline, 'boutons');
+  if (b.dataset.di) setTarget(S.targetSpeed, S.targetIncline + +b.dataset.di, 'boutons');
+  if (b.dataset.ps) setTarget(+b.dataset.ps, S.targetIncline, 'préréglage');
+  if (b.dataset.pi) setTarget(S.targetSpeed, +b.dataset.pi, 'préréglage');
 });
 document.addEventListener('keydown', e => {
   if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || $('#tab-seance').hidden) return;
