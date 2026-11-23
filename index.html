@@ -439,6 +439,7 @@ dialog.sheet::backdrop{background:rgba(46,42,36,.38)}
         <p class="prose">Trames envoyées (marron) et reçues (vert). Si une valeur ne colle pas avec l'écran du tapis, copie ce journal : il suffit pour corriger le décodage.</p>
         <pre class="log" id="log"></pre>
       </div>
+      <p class="ds-note" id="appVer" style="text-align:center"></p>
     </div>
   </section>
 </div>
@@ -1219,6 +1220,21 @@ if (!store.get('removed.v1', false)){
   if (programs.length !== n) saveProgs();
   store.set('removed.v1', true);
 }
+const REMOVED_NAMES = ['Marche 15 min', 'Marche 20 min', 'Marche 20 min, finale à 3,5', 'Collines 15 min'];
+if (!store.get('removed.v2', false)){
+  const n = programs.length;
+  programs = programs.filter(p => !REMOVED_NAMES.includes(String(p.name).replace(/( \((importé|copie)\))+$/, '')));
+  if (programs.length !== n) saveProgs();
+  store.set('removed.v2', true);
+}
+// Vallons 70 min : remis s'il manque (identifiant différent, ou liste écrasée par un import)
+if (!store.get('ensured.p8', false)){
+  const v = ADDED.find(x => x.id === 'p8');
+  if (v && !programs.some(x => x.id === 'p8' || x.name === v.name)){ programs.push(JSON.parse(JSON.stringify(v))); saveProgs(); }
+  store.set('ensured.p8', true);
+}
+// Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
+const APP_VERSION = '23/11/2026 09:15';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 
@@ -1627,6 +1643,7 @@ $('#btnCopyHist').addEventListener('click', e => copy(JSON.stringify(store.get('
 $('#btnCopyLog').addEventListener('click', e => copy(logText(logLines), e.currentTarget));
 $('#btnShareLog').addEventListener('click', e => shareText('Journal Foulée', 'Journal Foulée\n' + logText(logLines), e.currentTarget));
 $('#setWeight').value = settings.weight; $('#setKcal').value = settings.kcal; $('#setStartSpeed').value = settings.startSpeed; $('#setScan').value = settings.scan;
+$('#appVer').textContent = 'Version du ' + APP_VERSION;
 $('#setAuto').value = settings.autoConnect === false ? 'off' : 'on';
 if (navigator.bluetooth && !navigator.bluetooth.getDevices) $('#autoHint').innerHTML = '<b>Indisponible dans ce Chrome.</b> Pour l\'activer : ouvre <code>chrome://flags</code>, active « Experimental Web Platform features » et « Use the new permissions backend for Web Bluetooth », relance Chrome, puis connecte le tapis une fois avec le bouton.';
 $('#setAuto').addEventListener('change', e => { settings.autoConnect = e.target.value === 'on'; saveSettings(); log('', 'Connexion à l\'ouverture : ' + (settings.autoConnect ? 'automatique' : 'manuelle')); });
