@@ -1078,7 +1078,7 @@ function cleanHugoProgram(o){
   const tot = segs.reduce((a, x) => a + x.d, 0);
   if (tot > 4 * 3600) throw new Error('programme de plus de 4 h');
   const pid = String(o.pid || ('h' + Date.now())).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64) || ('h' + Date.now());
-  return { id: 'hugo-' + pid, name: String(o.name || 'Séance de Hugo').slice(0, 60), segments: segs, par: String(o.par || 'Hugo').slice(0, 20), pid, note: o.note ? String(o.note).slice(0, 300) : '' };
+  return { id: 'hugo-' + pid, name: String(o.name || 'Séance de Hugo').slice(0, 60), segments: segs, par: String(o.par || 'Hugo').slice(0, 20), pid, note: o.note ? String(o.note).slice(0, 300) : '', keep: !!o.keep };
 }
 let hugoProg = null;
 async function readHashProgram(){
@@ -1089,7 +1089,7 @@ async function readHashProgram(){
   try {
     const p = cleanHugoProgram(await unpackCode(raw, 'FP1'));
     const same = programs.find(x => x.id !== p.id && progSig(x) === progSig(p)), k = programs.findIndex(x => x.id === p.id);
-    if (same) { hugoProg = Object.assign({}, same, { runPid: p.pid, note: p.note, par: p.par }); log('', 'Programme reçu identique à « ' + same.name + ' » : on lance celui-ci, sans doublon'); }
+    if (same) { if (p.keep && !same.keep) same.keep = true; hugoProg = Object.assign({}, same, { runPid: p.pid, note: p.note, par: p.par }); log('', 'Programme reçu identique à « ' + same.name + ' » : on lance celui-ci, sans doublon'); }
     else { if (k >= 0) programs[k] = Object.assign({}, p, { done: programs[k].done || 0 }); else programs.unshift(Object.assign({ done: 0 }, p)); pruneHugo(); hugoProg = p; }
     saveProgs(); renderPrograms();
     log('', 'Programme reçu de ' + p.par + ' : « ' + p.name + ' », ' + p.segments.length + ' étapes, ' + hms(progDur(p)));
@@ -1392,7 +1392,7 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '23/11/2026 16:00';
+const APP_VERSION = '23/11/2026 21:00';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 
@@ -1457,7 +1457,8 @@ function edSum(){ const el = $('#edSum'); if (el) el.textContent = hms(progDur(e
 // Programmes de Hugo : gardés dans la liste une fois terminés 2 fois (HUGO_KEEP) ; avant, en attente (8 au plus)
 const HUGO_KEEP = 2;
 const progSig = p => JSON.stringify((p.segments || []).map(x => [Math.round(+x.d), Math.round(+x.s * 10) / 10, Math.round(+x.i || 0)]));
-const progShown = p => !p.pid || (p.done || 0) >= HUGO_KEEP || (prog && prog.p.id === p.id);
+// keep : programme créé exprès par Hugo dans Route des Vins → gardé dès le premier lancement
+const progShown = p => !p.pid || p.keep || (p.done || 0) >= HUGO_KEEP || (prog && prog.p.id === p.id);
 function pruneHugo(){ let n = 0; programs = programs.filter(p => progShown(p) || ++n <= 8); } // les plus récents sont en tête : le programme reçu est toujours gardé
 function countDone(id){
   const p = programs.find(x => x.id === id); if (!p) return;
