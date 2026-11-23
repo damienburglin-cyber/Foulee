@@ -66,6 +66,8 @@ code{font-family:var(--f-mono);font-size:.9em;background:var(--sunk);padding:1px
 .btn:active{box-shadow:var(--shadow-inset)}
 .btn.primary{min-height:var(--tap-main);padding:10px 18px;background:var(--green-d);color:#ffffff;box-shadow:0 5px 12px rgba(79,115,66,.25)}
 .btn.sky{background:var(--sky-d);color:#ffffff}
+.btn.halt{background:var(--wine);color:#ffffff}
+.btn[hidden]{display:none}
 .btn.ghost{background:transparent;box-shadow:none;padding:0 4px;color:var(--gold-d);text-decoration:underline;text-underline-offset:3px}
 .btn.small{font-size:14px;padding:8px 12px}
 .btn.primary.small{min-height:var(--tap-min)}
@@ -260,6 +262,7 @@ dialog.sheet::backdrop{background:rgba(46,42,36,.38)}
       <span class="chip" id="connChip">Déconnecté</span>
       <span class="grow label" id="devName">FOUSAE FS-8BE095</span>
       <button class="btn sky" id="btnConnect">Connecter le tapis</button>
+      <button class="btn halt" id="btnConnStop" hidden>Stop</button>
       <button class="btn ghost" id="btnDemo">Mode démo</button>
     </div>
   </header>
@@ -368,6 +371,8 @@ dialog.sheet::backdrop{background:rgba(46,42,36,.38)}
         <div class="field"><label class="label" for="setAuto">Connexion à l'ouverture</label>
           <select id="setAuto"><option value="on">Automatique (tapis déjà connecté une fois)</option><option value="off">Manuelle, avec le bouton</option></select>
           <span class="hint">Il faut s'être connecté une fois avec le bouton. Le tapis doit être allumé et FitShow fermée.</span></div>
+        <div class="field"><button class="btn small" id="btnForget" type="button">Oublier le tapis</button>
+          <span class="hint">Si la connexion bloque : efface le tapis mémorisé sur ce téléphone, puis reconnecte-le avec le bouton.</span></div>
         <h2 style="margin-top:6px">Tapis</h2>
         <dl class="dl" id="devInfo"></dl>
         <div id="btSection" style="display:flex;flex-direction:column;gap:var(--space-4)">
@@ -704,9 +709,32 @@ async function diag(){
   try { const st = await navigator.permissions.query({ name: 'bluetooth' }); log('', 'Diag · permission Bluetooth : ' + st.state); } catch(e){}
 }
 
+// Tentative de connexion en cours (bouton ou auto) : une seule à la fois, annulable
+let conn = null;
+const abortErr = () => { const e = new Error('connexion annulée'); e.name = 'AbortError'; return e; };
+// Chrome Android peut laisser gatt.connect() en attente sans fin : chaque étape a un délai max
+function withTimeout(p, ms, what){
+  let t;
+  return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => { const e = new Error(what + ' : pas de réponse en ' + Math.round(ms / 1000) + ' s'); e.name = 'TimeoutError'; rej(e); }, ms); })])
+    .finally(() => clearTimeout(t));
+}
+function cancelConnect(){
+  const att = conn; if (!att) return;
+  att.cancelled = true; conn = null;
+  log('', '— Connexion annulée');
+  if (att.ctl) try { att.ctl.abort(); } catch(e){}
+  if (att.drv) try { att.drv.disconnect(); } catch(e){}
+  if (att.device) try { att.device.gatt.disconnect(); } catch(e){}
+  if (driver && driver === att.drv){ driver = null; S.mode = null; }
+  if (att.device) $('#devName').textContent = att.device.name || 'Tapis';
+  setStatus('off'); render();
+}
+
 async function connect(){
+  if (conn) return cancelConnect();
   log('', '— Clic sur « Connecter le tapis »');
   if (!navigator.bluetooth){ log('err', 'Arrêt : API Bluetooth web absente' + (window.isSecureContext ? '' : ' (page non sécurisée)')); notice(noBtMessage(), true); return; }
+  const att = conn = { cancelled: false, device: null };
   try {
     notice('');
     const all = settings.scan === 'all';
@@ -714,55 +742,74 @@ async function connect(){
     const opts = { optionalServices: [0xfff0, 0xffe0, 0x1826, 0x180a] };
     if (all) opts.acceptAllDevices = true; else opts.filters = [{ namePrefix: 'FS-' }, { services: [0xfff0] }, { services: [0x1826] }];
     const device = await navigator.bluetooth.requestDevice(opts);
+    if (att.cancelled) return;
     log('', 'Appareil choisi : ' + (device.name || '(sans nom)') + ' · id ' + device.id);
-    await connectDevice(device);
-  } catch(e){ connectError(e); }
+    att.device = device; render();
+    await connectDevice(device, att);
+  } catch(e){ if (!att.cancelled) connectError(e); }
+  finally { if (conn === att) conn = null; render(); }
 }
 // Connexion à un appareil déjà choisi : sert au bouton et à la connexion automatique
-async function connectDevice(device){
-    $('#devName').textContent = device.name || 'Tapis';
-    store.set('lastDevice', { id: device.id, name: device.name || '' });
+async function connectDevice(device, att){
+  const check = () => { if (att.cancelled) throw abortErr(); };
+  $('#devName').textContent = (device.name || 'Tapis') + ' · connexion…';
+  store.set('lastDevice', { id: device.id, name: device.name || '' });
+  // Une seule écoute par appareil, même après plusieurs essais
+  device.ongattserverdisconnected = () => { log('err', 'Tapis déconnecté'); if (S.status === 'running') finishSession(); if (S.mode !== 'demo'){ driver = null; S.mode = null; setStatus('off'); } render(); };
+  try {
     log('', 'Connexion GATT…');
-    device.addEventListener('gattserverdisconnected', () => { log('err', 'Tapis déconnecté'); if (S.status === 'running') finishSession(); driver = null; S.mode = null; setStatus('off'); });
-    const server = await device.gatt.connect();
+    const server = await withTimeout(device.gatt.connect(), 15000, 'Connexion GATT'); check();
     log('', 'GATT connecté, lecture des services…');
-    const services = await server.getPrimaryServices();
+    const services = await withTimeout(server.getPrimaryServices(), 10000, 'Lecture des services'); check();
     const uuids = services.map(s => s.uuid.slice(4, 8));
     log('', 'Services : ' + uuids.join(', '));
     const ftms = services.find(s => s.uuid.startsWith('00001826'));
     const fs = services.find(s => s.uuid.startsWith('0000fff0')) || services.find(s => s.uuid.startsWith('0000ffe0'));
     resetCounters();
+    let drv = null, mode = null;
     if (ftms){
-      const chars = await ftms.getCharacteristics(), byId = id => chars.find(c => c.uuid.startsWith('0000' + id));
+      const chars = await withTimeout(ftms.getCharacteristics(), 10000, 'Lecture FTMS'), byId = id => chars.find(c => c.uuid.startsWith('0000' + id)); check();
       const data = byId('2acd'), cp = byId('2ad9');
-      if (data && cp){ driver = FTMSDriver(server, ftms, data, cp, byId('2ada')); S.mode = 'ftms'; }
+      if (data && cp){ drv = FTMSDriver(server, ftms, data, cp, byId('2ada')); mode = 'ftms'; }
     }
-    if (!driver && fs){
-      const chars = await fs.getCharacteristics();
+    if (!drv && fs){
+      const chars = await withTimeout(fs.getCharacteristics(), 10000, 'Lecture FitShow'); check();
       const wr = chars.find(c => /^0000(fff2|ffe1)/.test(c.uuid)) || chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
       const nt = chars.find(c => /^0000(fff1|ffe1|ffe4)/.test(c.uuid) && (c.properties.notify || c.properties.indicate)) || chars.find(c => c.properties.notify);
-      if (wr && nt){ driver = FitShowDriver(server, fs, wr, nt); S.mode = 'fitshow'; }
+      if (wr && nt){ drv = FitShowDriver(server, fs, wr, nt); mode = 'fitshow'; }
     }
-    if (!driver){ notice('<div><b>Protocole non reconnu.</b> Le tapis expose les services ' + uuids.join(', ') + '. Copie le journal (onglet Réglages) pour qu\'on ajoute son protocole.</div>', true); server.disconnect(); return; }
-    S.info['Protocole'] = driver.name;
-    await driver.init();
-    log('', 'Prêt, protocole ' + driver.name);
+    if (!drv){ notice('<div><b>Protocole non reconnu.</b> Le tapis expose les services ' + uuids.join(', ') + '. Copie le journal (onglet Réglages) pour qu\'on ajoute son protocole.</div>', true); server.disconnect(); $('#devName').textContent = device.name || 'Tapis'; return; }
+    att.drv = drv; driver = drv; S.mode = mode;
+    S.info['Protocole'] = drv.name;
+    await withTimeout(drv.init(), 10000, 'Initialisation du tapis'); check();
+    $('#devName').textContent = device.name || 'Tapis';
+    log('', 'Prêt, protocole ' + drv.name);
     render();
+  } catch(e){
+    if (att.drv) try { att.drv.disconnect(); } catch(_){}
+    try { device.gatt.disconnect(); } catch(_){}
+    if (driver && driver === att.drv){ driver = null; S.mode = null; }
+    att.drv = null;
+    if (!att.cancelled) $('#devName').textContent = device.name || 'Tapis';
+    throw e;
+  }
 }
 function connectError(e){
     log('err', 'Échec : ' + e.name + ' : ' + e.message);
+    if (e.name === 'AbortError') return;
     if (e.name === 'NotFoundError') {
       if (/cancel/i.test(e.message)) { log('', 'Sélecteur fermé sans choisir d\'appareil'); return; }
       notice('<div><b>Aucun tapis trouvé.</b> ' + e.message + '. Vérifie que le Bluetooth et la localisation du téléphone sont activés, que Chrome a l\'autorisation « Appareils à proximité », et que FitShow est fermée. Tu peux aussi passer la recherche sur « Tous les appareils » dans Réglages.</div>', true);
       return;
     }
     if (e.name === 'SecurityError' || /permission|policy|allowed/i.test(e.message)) { notice(noBtMessage(), true); return; }
-    notice('<div><b>Connexion impossible.</b> ' + e.message + '. Vérifie que le tapis est allumé et qu\'aucune autre app (FitShow) n\'y est connectée. Détail dans Réglages, journal Bluetooth.</div>', true);
+    if (e.name === 'TimeoutError') { notice('<div><b>Le tapis ne répond pas.</b> ' + e.message + '. Un tapis Bluetooth n\'accepte qu\'un seul téléphone : ferme Foulée et FitShow sur les autres téléphones, éteins puis rallume le tapis, puis réessaie.</div>', true); return; }
+    notice('<div><b>Connexion impossible.</b> ' + e.message + '. Vérifie que le tapis est allumé et qu\'aucune autre app (FitShow) ni aucun autre téléphone n\'y est connecté. Détail dans Réglages, journal Bluetooth.</div>', true);
 }
 // Au chargement : reconnexion au tapis déjà autorisé, sans passer par le sélecteur (Chrome n'ouvre le sélecteur que sur un geste).
 // Demande navigator.bluetooth.getDevices() ; sinon le journal le dit et le bouton reste nécessaire.
 async function autoConnect(){
-  if (settings.autoConnect === false || driver) return;
+  if (settings.autoConnect === false || driver || conn) return;
   if (!navigator.bluetooth) return;
   if (!navigator.bluetooth.getDevices){ log('', 'Connexion auto : ce navigateur ne la permet pas (getDevices absent). Touche « Connecter le tapis ».'); return; }
   let devs = [];
@@ -772,22 +819,46 @@ async function autoConnect(){
   log('', 'Connexion auto : ' + devs.length + ' appareil' + (devs.length > 1 ? 's' : '') + ' déjà autorisé' + (devs.length > 1 ? 's' : '') + (devs.length ? ' (' + devs.map(d => d.name || d.id).join(', ') + ')' : ''));
   const dev = devs.find(d => last && d.id === last.id) || devs.find(d => /^FS-/.test(d.name || '')) || (devs.length === 1 ? devs[0] : null);
   if (!dev){ log('', 'Connexion auto : aucun tapis déjà autorisé. Connecte-toi une fois avec le bouton, ensuite ce sera automatique.'); return; }
-  $('#devName').textContent = (dev.name || 'Tapis') + ' · recherche…';
-  // Chrome demande souvent d'avoir « vu » l'appareil depuis l'ouverture de la page avant de s'y connecter
-  if (dev.watchAdvertisements){
-    const seen = await new Promise(res => {
-      const ctl = new AbortController(), t = setTimeout(() => { ctl.abort(); res(false); }, 10000);
-      dev.addEventListener('advertisementreceived', () => { clearTimeout(t); ctl.abort(); res(true); }, { once: true });
-      dev.watchAdvertisements({ signal: ctl.signal }).catch(e => { log('', 'Connexion auto : écoute des annonces impossible (' + e.name + ')'); clearTimeout(t); res(null); });
-    });
-    log('', seen ? 'Connexion auto : tapis détecté à proximité' : seen === false ? 'Connexion auto : pas d\'annonce du tapis en 10 s (éteint ou déjà connecté ailleurs ?), essai quand même' : 'Connexion auto : essai direct');
-  }
-  for (let i = 1; i <= 3 && !driver; i++){
-    try { log('', 'Connexion auto à ' + (dev.name || dev.id) + ', essai ' + i + '/3'); await connectDevice(dev); }
-    catch(e){ log('err', 'Connexion auto, essai ' + i + ' : ' + e.name + ' : ' + e.message); if (i < 3) await sleep(2500); }
-  }
-  if (driver) toast('Tapis connecté automatiquement');
-  else { $('#devName').textContent = dev.name || 'Tapis'; log('', 'Connexion auto abandonnée : touche « Connecter le tapis »'); }
+  if (conn || driver) return;
+  const att = conn = { cancelled: false, device: dev, auto: true };
+  render();
+  try {
+    $('#devName').textContent = (dev.name || 'Tapis') + ' · recherche…';
+    // Chrome demande souvent d'avoir « vu » l'appareil depuis l'ouverture de la page avant de s'y connecter
+    if (dev.watchAdvertisements){
+      const seen = await new Promise(res => {
+        const ctl = att.ctl = new AbortController(), t = setTimeout(() => { ctl.abort(); res(false); }, 10000);
+        ctl.signal.addEventListener('abort', () => { clearTimeout(t); res(att.cancelled ? null : false); });
+        dev.addEventListener('advertisementreceived', () => { clearTimeout(t); ctl.abort(); res(true); }, { once: true });
+        dev.watchAdvertisements({ signal: ctl.signal }).catch(e => { log('', 'Connexion auto : écoute des annonces impossible (' + e.name + ')'); clearTimeout(t); res(null); });
+      });
+      att.ctl = null;
+      if (att.cancelled) return;
+      log('', seen ? 'Connexion auto : tapis détecté à proximité' : seen === false ? 'Connexion auto : pas d\'annonce du tapis en 10 s (éteint ou déjà connecté ailleurs ?), essai quand même' : 'Connexion auto : essai direct');
+    }
+    for (let i = 1; i <= 2 && !driver && !att.cancelled; i++){
+      try { log('', 'Connexion auto à ' + (dev.name || dev.id) + ', essai ' + i + '/2'); await connectDevice(dev, att); }
+      catch(e){ if (att.cancelled) break; log('err', 'Connexion auto, essai ' + i + ' : ' + e.name + ' : ' + e.message); if (i < 2) await sleep(2500); }
+    }
+    if (att.cancelled) return;
+    if (driver) toast('Tapis connecté automatiquement');
+    else { $('#devName').textContent = dev.name || 'Tapis'; log('', 'Connexion auto abandonnée : touche « Connecter le tapis »'); }
+  } finally { if (conn === att) conn = null; render(); }
+}
+// Oublie les tapis autorisés : la connexion auto s'arrête, la prochaine connexion repasse par le sélecteur
+async function forgetDevices(){
+  if (conn) cancelConnect();
+  if (driver && S.mode !== 'demo') try { driver.disconnect(); } catch(e){}
+  let n = 0;
+  try {
+    const devs = navigator.bluetooth && navigator.bluetooth.getDevices ? await navigator.bluetooth.getDevices() : [];
+    for (const d of devs){ try { if (d.gatt.connected) d.gatt.disconnect(); } catch(e){} if (d.forget){ try { await d.forget(); n++; } catch(e){ log('err', 'Oubli de ' + (d.name || d.id) + ' : ' + e.message); } } }
+  } catch(e){ log('err', 'Oubli des tapis : ' + e.message); }
+  try { localStorage.removeItem('foulee.lastDevice'); } catch(e){}
+  log('', 'Tapis oubliés : ' + n);
+  $('#devName').textContent = 'Aucun tapis';
+  toast(n ? 'Tapis oublié. Reconnecte-le avec le bouton.' : 'Plus de tapis mémorisé. Reconnecte-le avec le bouton.');
+  render();
 }
 async function startDemo(){
   if (driver) driver.disconnect();
@@ -1166,9 +1237,12 @@ function renderPresets(){
 function renderInfo(){ $('#devInfo').innerHTML = Object.entries(S.info).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('') || '<dt>État</dt><dd>Non connecté</dd>'; }
 function render(){
   const chip = $('#connChip');
-  chip.className = 'chip ' + (S.mode === 'demo' ? 'warn' : S.mode ? 'ok' : '');
-  chip.textContent = S.mode === 'demo' ? 'Démo' : S.mode ? 'Connecté · ' + (S.mode === 'ftms' ? 'FTMS' : 'FitShow') : 'Déconnecté';
-  $('#btnConnect').textContent = S.mode && S.mode !== 'demo' ? 'Déconnecter' : 'Connecter le tapis';
+  const busy = !!conn && !driver;
+  chip.className = 'chip ' + (busy ? 'warn' : S.mode === 'demo' ? 'warn' : S.mode ? 'ok' : '');
+  chip.textContent = busy ? 'Connexion…' : S.mode === 'demo' ? 'Démo' : S.mode ? 'Connecté · ' + (S.mode === 'ftms' ? 'FTMS' : 'FitShow') : 'Déconnecté';
+  $('#btnConnect').textContent = conn ? 'Connexion…' : S.mode && S.mode !== 'demo' ? 'Déconnecter' : 'Connecter le tapis';
+  $('#btnConnect').disabled = !!conn;
+  $('#btnConnStop').hidden = !conn;
 
   const st = $('#vState'); st.className = 'state ' + S.status;
   st.querySelector('span').textContent = S.status === 'starting' && S.countdown > 0 ? 'Départ dans ' + S.countdown : S.status === 'error' ? (S.errorMsg || 'Erreur') : boot && S.status === 'running' ? 'Mise en vitesse' : LABEL[S.status];
@@ -1265,7 +1339,9 @@ function placeTabDisc(){
 window.addEventListener('resize', placeTabDisc);
 
 /* ---------- Événements ---------- */
-$('#btnConnect').addEventListener('click', () => { if (S.mode && S.mode !== 'demo'){ driver.disconnect(); } else connect(); });
+$('#btnConnect').addEventListener('click', () => { if (conn) cancelConnect(); else if (S.mode && S.mode !== 'demo' && driver){ driver.disconnect(); } else connect(); });
+$('#btnForget').addEventListener('click', forgetDevices);
+$('#btnConnStop').addEventListener('click', cancelConnect);
 $('#btnDemo').addEventListener('click', startDemo);
 $('#btnStart').addEventListener('click', startPause);
 $('#btnStop').addEventListener('click', stopBelt);
