@@ -370,7 +370,7 @@ dialog.sheet::backdrop{background:rgba(46,42,36,.38)}
           <span class="hint">Si le tapis n'apparaît pas, passe sur « Tous les appareils » et cherche son nom dans la liste.</span></div>
         <div class="field"><label class="label" for="setAuto">Connexion à l'ouverture</label>
           <select id="setAuto"><option value="on">Automatique (tapis déjà connecté une fois)</option><option value="off">Manuelle, avec le bouton</option></select>
-          <span class="hint">Il faut s'être connecté une fois avec le bouton. Le tapis doit être allumé et FitShow fermée.</span></div>
+          <span class="hint" id="autoHint">Il faut s'être connecté une fois avec le bouton. Le tapis doit être allumé et FitShow fermée.</span></div>
         <div class="field"><button class="btn small" id="btnForget" type="button">Oublier le tapis</button>
           <span class="hint">Si la connexion bloque : efface le tapis mémorisé sur ce téléphone, puis reconnecte-le avec le bouton.</span></div>
         <h2 style="margin-top:6px">Tapis</h2>
@@ -811,7 +811,11 @@ function connectError(e){
 async function autoConnect(){
   if (settings.autoConnect === false || driver || conn) return;
   if (!navigator.bluetooth) return;
-  if (!navigator.bluetooth.getDevices){ log('', 'Connexion auto : ce navigateur ne la permet pas (getDevices absent). Touche « Connecter le tapis ».'); return; }
+  if (!navigator.bluetooth.getDevices){
+    log('err', 'Connexion auto : ce Chrome ne la permet pas (getDevices absent, options chrome://flags désactivées). Touche « Connecter le tapis ».');
+    if (!store.get('autoWarned', false)){ store.set('autoWarned', true); notice('<div><b>Connexion auto indisponible dans ce Chrome.</b> Touche « Connecter le tapis » à chaque séance, ou active-la : détail dans Réglages, « Connexion à l\'ouverture ».</div>'); }
+    return;
+  }
   let devs = [];
   try { devs = await navigator.bluetooth.getDevices(); }
   catch(e){ log('err', 'Connexion auto : ' + e.name + ' : ' + e.message); return; }
@@ -827,9 +831,9 @@ async function autoConnect(){
     // Chrome demande souvent d'avoir « vu » l'appareil depuis l'ouverture de la page avant de s'y connecter
     if (dev.watchAdvertisements){
       const seen = await new Promise(res => {
-        const ctl = att.ctl = new AbortController(), t = setTimeout(() => { ctl.abort(); res(false); }, 10000);
+        const ctl = att.ctl = new AbortController(), t = setTimeout(() => { res(false); ctl.abort(); }, 10000);
         ctl.signal.addEventListener('abort', () => { clearTimeout(t); res(att.cancelled ? null : false); });
-        dev.addEventListener('advertisementreceived', () => { clearTimeout(t); ctl.abort(); res(true); }, { once: true });
+        dev.addEventListener('advertisementreceived', () => { clearTimeout(t); res(true); ctl.abort(); }, { once: true });
         dev.watchAdvertisements({ signal: ctl.signal }).catch(e => { log('', 'Connexion auto : écoute des annonces impossible (' + e.name + ')'); clearTimeout(t); res(null); });
       });
       att.ctl = null;
@@ -1486,6 +1490,7 @@ $('#btnCopyLog').addEventListener('click', e => copy(logText(logLines), e.curren
 $('#btnShareLog').addEventListener('click', e => shareText('Journal Foulée', 'Journal Foulée\n' + logText(logLines), e.currentTarget));
 $('#setWeight').value = settings.weight; $('#setKcal').value = settings.kcal; $('#setStartSpeed').value = settings.startSpeed; $('#setScan').value = settings.scan;
 $('#setAuto').value = settings.autoConnect === false ? 'off' : 'on';
+if (navigator.bluetooth && !navigator.bluetooth.getDevices) $('#autoHint').innerHTML = '<b>Indisponible dans ce Chrome.</b> Pour l\'activer : ouvre <code>chrome://flags</code>, active « Experimental Web Platform features » et « Use the new permissions backend for Web Bluetooth », relance Chrome, puis connecte le tapis une fois avec le bouton.';
 $('#setAuto').addEventListener('change', e => { settings.autoConnect = e.target.value === 'on'; saveSettings(); log('', 'Connexion à l\'ouverture : ' + (settings.autoConnect ? 'automatique' : 'manuelle')); });
 $('#setScan').addEventListener('change', e => { settings.scan = e.target.value; saveSettings(); log('', 'Recherche : ' + (settings.scan === 'all' ? 'tous les appareils' : 'filtrée')); });
 $('#setWeight').addEventListener('change', e => { settings.weight = clamp(+e.target.value || 75, 30, 200); saveSettings(); });
