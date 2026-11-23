@@ -486,9 +486,9 @@ dialog.sheet::backdrop{background:rgba(46,42,36,.38)}
   <div class="big-ctl">
     <div class="big-lbl"><span>Pente</span><span class="num" id="bIncReal"></span></div>
     <div class="big-row">
-      <button data-bi="-1" id="bIncDn" aria-label="Pente moins">−0,5</button>
+      <button data-bi="-1" id="bIncDn" aria-label="Pente moins 1">−1</button>
       <div class="big-val"><span class="num" id="bInc">0</span><small>%</small></div>
-      <button data-bi="1" id="bIncUp" aria-label="Pente plus">+0,5</button>
+      <button data-bi="1" id="bIncUp" aria-label="Pente plus 1">+1</button>
     </div>
   </div>
   <div class="big-metrics">
@@ -524,8 +524,8 @@ const store = {
 const fr1 = n => (Math.round(n * 10) / 10).toFixed(1).replace('.', ',');
 const fr2 = n => n.toFixed(2).replace('.', ',');
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-// Pente : pas de 0,5 % en FTMS et en démo ; le protocole FitShow ne connaît que le % entier
-const incStep = () => S.mode === 'fitshow' ? 1 : 0.5;
+// Pente : le tapis la règle au % entier, donc pas de 1 %
+const incStep = () => 1;
 const frI = v => String(Math.round(v * 2) / 2).replace('.', ',');
 const hms = s => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
   return (h ? h + ':' + String(m).padStart(2, '0') : String(m).padStart(2, '0')) + ':' + String(x).padStart(2, '0'); };
@@ -1349,8 +1349,6 @@ function renderBig(){
   // Valeur réelle du tapis, affichée seulement quand elle diffère de la consigne
   $('#bSpReal').textContent = Math.abs(S.speed - S.targetSpeed) > 0.05 ? 'tapis ' + fr1(S.speed) : '';
   $('#bIncReal').textContent = Math.abs(S.incline - S.targetIncline) > incStep() / 2 ? 'tapis ' + frI(S.incline) : '';
-  const stp = incStep() === 1 ? '1' : '0,5';
-  $('#bIncDn').textContent = '−' + stp; $('#bIncUp').textContent = '+' + stp;
   $('#bDist').innerHTML = fr2(shown.distance()) + '<small>km</small>';
   $('#bKcal').textContent = Math.round(shown.kcal());
   if (S.speed > 0.5){ const p = 60 / S.speed; $('#bPace').textContent = Math.floor(p) + ':' + String(Math.round(p % 1 * 60) % 60).padStart(2, '0'); } else $('#bPace').textContent = '–';
