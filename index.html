@@ -1110,14 +1110,14 @@ async function hugoGo(){
   hugoProg = null; renderHugo();
   launchProgram(p.id);
 }
-// Code de séance pour Route des Vins : bilan, prévu (si programme) et relevé toutes les 10 s [t, vitesse, pente, pouls]
+// Code de séance pour Route des Vins : bilan, prévu (si programme) et relevé toutes les 10 s [t, vitesse, pente, pouls, étape du programme (−1 : hors programme)]
 function sessionPayload(s){
   const st = sessionStats(s.samples), g = k => s[k] != null ? s[k] : st[k], r1 = v => v == null ? null : Math.round(v * 10) / 10;
   return { v: 1, app: 'Foulee', id: s.id, debut: s.start, fin: s.end || null, programme: s.program || null, pid: s.pid || null, prevu: s.plan || null,
     duree: Math.round(s.duration), distance: Math.round(s.distance * 1000) / 1000, kcal: Math.round(s.kcal || 0),
     vitesseMoy: r1(s.avgSpeed), vitesseMax: r1(g('maxSpeed')), penteMoy: r1(g('avgIncline')), penteMax: r1(g('maxIncline')),
     denivele: g('elevation') != null ? Math.round(g('elevation')) : null, pas: s.steps || null, fcMoy: g('hrAvg') || null, fcMax: g('hrMax') || null,
-    source: s.source || null, releve: (s.samples || []).map(x => [x[0], r1(x[1]), r1(x[2]), x[3] || 0]) };
+    source: s.source || null, releve: (s.samples || []).map(x => [x[0], r1(x[1]), r1(x[2]), x[3] || 0, x[4] != null ? x[4] : -1]) };
 }
 let sumCur = null;
 async function sendToRdv(){
@@ -1595,7 +1595,7 @@ function render(){
 setInterval(() => {
   if (S.status === 'running'){
     S.loc.elapsed++; S.loc.distance += S.speed / 3600; S.loc.kcal += kcalPerMin(S.speed, S.incline) / 60;
-    if (session) session.samples.push([Math.round(shown.elapsed()), S.speed, S.incline, S.m.hr || 0]);
+    if (session) session.samples.push([Math.round(shown.elapsed()), S.speed, S.incline, S.m.hr || 0, prog && !boot ? prog.seg : -1]);
     syncTick();
     progTick();
   } else if (S.status === 'starting' && boot && driver && S.mode !== 'demo') bootTick();
