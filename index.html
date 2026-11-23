@@ -1087,18 +1087,12 @@ function startPause(){
 function stopBelt(){ if (driver) driver.stop(); }
 
 /* ---------- Programmes ---------- */
-const EXAMPLES = [
-  { id: 'p1', name: 'Marche 15 min', segments: [{d:180,s:2.5,i:0},{d:540,s:3,i:0},{d:180,s:2.5,i:0}] },
-  { id: 'p2', name: 'Marche 20 min', segments: [{d:180,s:2.5,i:0},{d:840,s:3,i:0},{d:180,s:2.5,i:0}] },
-  { id: 'p3', name: 'Marche 20 min, finale à 3,5', segments: [{d:180,s:2.5,i:0},{d:540,s:3,i:0},{d:300,s:3.5,i:0},{d:180,s:2.5,i:0}] }
-];
+// Programmes de départ : Coteaux, Décrassage et Montées (liste ADDED ci-dessous)
+const EXAMPLES = [];
 let programs = store.get('programs', null) || EXAMPLES;
 const saveProgs = () => store.set('programs', programs);
 // Programmes ajoutés après coup : posés une seule fois, même si la liste existe déjà (supprimés ensuite = ne reviennent pas)
 const ADDED = [
-  { id: 'p4', name: 'Collines 15 min', segments: [
-    {d:120,s:2.5,i:0},{d:90,s:3,i:1},{d:90,s:3,i:2},{d:90,s:3.5,i:3},{d:90,s:3,i:0},
-    {d:90,s:3.5,i:2},{d:90,s:3.5,i:3},{d:90,s:3,i:1},{d:150,s:2.5,i:0}] },
   { id: 'p5', name: 'Coteaux 15 min', segments: [
     {d:120,s:3,i:0},{d:90,s:3.5,i:1},{d:90,s:3.5,i:2},{d:90,s:4,i:2},{d:90,s:3.5,i:3},
     {d:90,s:4,i:0},{d:90,s:4,i:3},{d:90,s:3.5,i:1},{d:150,s:3,i:0}] },
@@ -1123,6 +1117,15 @@ ADDED.forEach(p => {
   if (!programs.some(x => x.id === p.id)) { programs.push(p); saveProgs(); }
   store.set('added.' + p.id, true);
 });
+// Programmes retirés (nov. 2026) : Marche 15, Marche 20, Marche 20 finale à 3,5 et Collines 15.
+// Enlevés une seule fois des listes déjà enregistrées ; les programmes créés à la main restent.
+const REMOVED = ['p1', 'p2', 'p3', 'p4'];
+if (!store.get('removed.v1', false)){
+  const n = programs.length;
+  programs = programs.filter(p => !REMOVED.includes(p.id));
+  if (programs.length !== n) saveProgs();
+  store.set('removed.v1', true);
+}
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 
