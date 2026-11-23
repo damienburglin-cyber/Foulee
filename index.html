@@ -160,6 +160,51 @@ code{font-family:var(--f-mono);font-size:.9em;background:var(--sunk);padding:1px
 .run .stop{background:var(--wine);color:#ffffff;box-shadow:var(--shadow-card)}
 .run button:active{box-shadow:var(--shadow-inset)}
 .run button:disabled{opacity:.45;cursor:not-allowed}
+/* Grand écran de séance : lisible téléphone posé sur le tapis, à un bras de distance */
+.big{position:fixed;inset:0;z-index:20;background:var(--bg);display:flex;flex-direction:column;gap:12px;padding:calc(10px + env(safe-area-inset-top,0px)) 14px calc(12px + env(safe-area-inset-bottom,0px));overflow-y:auto;overscroll-behavior:contain}
+.big[hidden]{display:none}
+.big-top{display:flex;align-items:center;gap:10px}
+.big-top .state{font-size:18px;padding:8px 16px}
+.big-time{flex:1;text-align:center;font:700 34px/1 var(--font-body);font-variant-numeric:tabular-nums}
+.big-top .btn{min-height:52px;font-size:16px}
+.big-prog{background:var(--card);border-radius:var(--radius-l);box-shadow:var(--shadow-card);padding:12px;display:grid;gap:8px}
+.big-prog .row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:2px 8px;font:700 18px/1.25 var(--font-body)}
+.big-prog .row b{font:600 20px/1.2 var(--font-display);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.big-prog .row span{white-space:nowrap;font-size:16px;color:var(--muted)}
+.big-prog .profile{height:96px}
+.big-next{font:700 20px/1.3 var(--font-body);color:var(--sage-ink)}
+.big-ctl{flex:1;min-height:150px;background:var(--card);border-radius:var(--radius-l);box-shadow:var(--shadow-card);padding:10px 12px;display:flex;flex-direction:column;justify-content:center;gap:4px}
+.big-lbl{display:flex;justify-content:space-between;font:700 18px/1.2 var(--font-body);color:var(--muted)}
+.big-row{display:grid;grid-template-columns:minmax(92px,1fr) 1.5fr minmax(92px,1fr);align-items:center;gap:10px}
+.big-row button{min-height:104px;border:none;border-radius:var(--radius-m);background:var(--panel2);color:var(--ink);box-shadow:var(--shadow-card);font:800 34px/1 var(--font-body);font-variant-numeric:tabular-nums;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.big-row button:active{box-shadow:var(--shadow-inset);background:var(--sky-d);color:#ffffff}
+.big-val{text-align:center;line-height:1}
+.big-val .num{display:block;font:800 76px/1 var(--font-body);font-variant-numeric:tabular-nums;letter-spacing:-1px}
+.big-val small{display:block;margin-top:8px;font:700 18px/1.2 var(--font-body);color:var(--muted)}
+.big-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.big-metrics div{background:var(--card);border-radius:var(--radius-m);box-shadow:var(--shadow-card);padding:8px;text-align:center}
+.big-metrics span{display:block;font:700 14px/1.2 var(--font-body);color:var(--muted)}
+.big-metrics b{font:800 28px/1.15 var(--font-body);font-variant-numeric:tabular-nums}
+.big-metrics small{font-size:15px;color:var(--muted);margin-left:2px}
+.big .run button{min-height:84px;font-size:24px}
+/* Téléphone en paysage : vitesse et pente côte à côte, tout tient sans défiler */
+@media (orientation:landscape) and (max-height:560px){
+  .big{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto 1fr auto;gap:8px;padding-top:calc(6px + env(safe-area-inset-top,0px));padding-bottom:calc(6px + env(safe-area-inset-bottom,0px))}
+  .big-top,.big-prog,.big .run{grid-column:1 / -1}
+  .big-top .btn{min-height:44px}
+  .big-time{font-size:28px}
+  .big-top .state{font-size:16px;padding:6px 12px}
+  .big-prog{padding:8px 12px;gap:4px}
+  .big-prog .profile{height:40px}
+  .big-next{font-size:17px}
+  .big-ctl{min-height:0;padding:6px 10px}
+  .big-row button{min-height:76px;font-size:28px}
+  .big-val .num{font-size:54px}
+  .big-val small{margin-top:4px;font-size:15px}
+  .big-metrics{display:none}
+  .big .run button{min-height:60px;font-size:20px}
+}
+
 .kbd{font-size:13px;color:var(--muted);margin:0}
 .kbd kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px;background:var(--panel)}
 @media (hover:none),(pointer:coarse){.kbd{display:none}}
@@ -284,6 +329,7 @@ dialog.sheet::backdrop{background:rgba(46,42,36,.38)}
         <div class="side">
           <span class="state" id="vState"><i></i><span>À l'arrêt</span></span>
           <span class="target num" id="vTarget"></span>
+          <button class="btn small" id="btnBig" hidden>Grand écran</button>
         </div>
       </div>
       <div class="run">
@@ -418,6 +464,43 @@ dialog.sheet::backdrop{background:rgba(46,42,36,.38)}
   </div>
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<div class="big" id="bigRun" hidden role="dialog" aria-modal="true" aria-label="Séance en cours, grand écran">
+  <div class="big-top">
+    <span class="state" id="bState"><i></i><span>En marche</span></span>
+    <span class="big-time num" id="bTime" aria-label="Temps écoulé">00:00</span>
+    <button class="btn" id="bClose">Réduire</button>
+  </div>
+  <div class="big-prog" id="bProg" hidden>
+    <div class="row"><b id="bpName"></b><span class="num" id="bpMeta"></span></div>
+    <svg class="profile" id="bpProfile" viewBox="0 0 600 96" preserveAspectRatio="none" role="img" aria-label="Profil du programme, trait = position actuelle"></svg>
+    <div class="big-next" id="bpNext"></div>
+  </div>
+  <div class="big-ctl">
+    <div class="big-lbl"><span>Vitesse</span><span class="num" id="bSpReal"></span></div>
+    <div class="big-row">
+      <button data-bs="-0.5" aria-label="Vitesse moins 0,5">−0,5</button>
+      <div class="big-val"><span class="num" id="bSpeed">0,0</span><small>km/h</small></div>
+      <button data-bs="0.5" aria-label="Vitesse plus 0,5">+0,5</button>
+    </div>
+  </div>
+  <div class="big-ctl">
+    <div class="big-lbl"><span>Pente</span><span class="num" id="bIncReal"></span></div>
+    <div class="big-row">
+      <button data-bi="-1" id="bIncDn" aria-label="Pente moins">−0,5</button>
+      <div class="big-val"><span class="num" id="bInc">0</span><small>%</small></div>
+      <button data-bi="1" id="bIncUp" aria-label="Pente plus">+0,5</button>
+    </div>
+  </div>
+  <div class="big-metrics">
+    <div><span>Distance</span><b class="num" id="bDist">0,00<small>km</small></b></div>
+    <div><span>Calories</span><b class="num" id="bKcal">0</b></div>
+    <div><span>Allure</span><b class="num" id="bPace">–</b></div>
+  </div>
+  <div class="run">
+    <button class="pause" id="bStart">Pause</button>
+    <button class="stop" id="bStop">Stop</button>
+  </div>
+</div>
 <div class="navdock">
 <nav class="ds-tabbar" id="tabbar" aria-label="Sections">
   <span class="pill" aria-hidden="true"></span>
@@ -441,6 +524,9 @@ const store = {
 const fr1 = n => (Math.round(n * 10) / 10).toFixed(1).replace('.', ',');
 const fr2 = n => n.toFixed(2).replace('.', ',');
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+// Pente : pas de 0,5 % en FTMS et en démo ; le protocole FitShow ne connaît que le % entier
+const incStep = () => S.mode === 'fitshow' ? 1 : 0.5;
+const frI = v => String(Math.round(v * 2) / 2).replace('.', ',');
 const hms = s => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
   return (h ? h + ':' + String(m).padStart(2, '0') : String(m).padStart(2, '0')) + ':' + String(x).padStart(2, '0'); };
 const hex = a => [...a].map(b => b.toString(16).padStart(2, '0')).join(' ');
@@ -467,6 +553,7 @@ const S = {
   info: {}
 };
 let driver = null, session = null, prog = null;
+const big = { open: false, dismissed: false };
 
 /* ---------- Journal ---------- */
 // Journal : gardé dans le navigateur (800 dernières lignes) pour survivre à un rechargement de la page
@@ -895,6 +982,10 @@ function setStatus(st){
   if (st !== 'running' && st !== 'starting') boot = null;
   if ((st === 'idle' || st === 'off') && (prev === 'running' || prev === 'paused')) finishSession();
   wake(st === 'running');
+  // Grand écran : s'ouvre au départ de la séance, se ferme à la fin (sauf si on l'a réduit)
+  const live = s => s === 'running' || s === 'paused' || s === 'starting';
+  if (live(st) && !live(prev) && !big.dismissed) big.open = true;
+  if (!live(st) && live(prev)){ big.open = false; big.dismissed = false; }
   render();
 }
 function beginSession(){
@@ -1015,7 +1106,7 @@ function bootTick(){
   if (S.status === 'starting'){ if (now - boot.lastSend >= 1000) bootSend('pendant le compte à rebours'); return; }
   if (S.speed <= 0) return;
   if (!boot.moveAt){ boot.moveAt = now; log('', 'Le tapis annonce ' + fr1(S.speed) + ' km/h'); }
-  const offS = Math.abs(S.speed - S.targetSpeed) > 0.05, offI = Math.abs(S.incline - S.targetIncline) > 0.5;
+  const offS = Math.abs(S.speed - S.targetSpeed) > 0.05, offI = Math.abs(S.incline - S.targetIncline) > incStep() / 2;
   const diff = Math.abs(S.speed - S.targetSpeed), closing = boot.prevDiff != null && diff < boot.prevDiff - 0.01;
   boot.prevDiff = diff; sync.lastS = S.speed; sync.lastI = S.incline;
   if (!offS && !offI){
@@ -1047,7 +1138,7 @@ function sendTarget(){
 }
 function setTarget(sp, inc){
   S.targetSpeed = clamp(Math.round(sp * 10) / 10, S.limits.minS, S.limits.maxS);
-  S.targetIncline = clamp(Math.round(inc), S.limits.minI, S.limits.maxI);
+  S.targetIncline = clamp(Math.round(inc / incStep()) * incStep(), S.limits.minI, S.limits.maxI);
   sync.pending = true; sync.t = Date.now(); sync.tries = 0;
   render();
   clearTimeout(tDeb);
@@ -1057,7 +1148,7 @@ function syncTick(){
   if (!driver || S.mode === 'demo') return;
   if (boot) return bootTick();
   if (S.speed <= 0) return;
-  const offS = Math.abs(S.speed - S.targetSpeed) > 0.05, offI = Math.abs(S.incline - S.targetIncline) > 0.5;
+  const offS = Math.abs(S.speed - S.targetSpeed) > 0.05, offI = Math.abs(S.incline - S.targetIncline) > incStep() / 2;
   const moved = S.speed !== sync.lastS || S.incline !== sync.lastI;
   sync.lastS = S.speed; sync.lastI = S.incline;
   if (!offS && !offI){
@@ -1074,7 +1165,7 @@ function syncTick(){
   adoptFromBelt();
 }
 function adoptFromBelt(){
-  const sp = Math.round(S.speed * 10) / 10, inc = Math.round(S.incline);
+  const sp = Math.round(S.speed * 10) / 10, inc = Math.round(S.incline / incStep()) * incStep();
   if (sp === S.targetSpeed && inc === S.targetIncline) return;
   log('', 'Changé sur le tapis : ' + fr1(sp) + ' km/h, ' + inc + ' %');
   S.targetSpeed = sp; S.targetIncline = inc;
@@ -1243,6 +1334,39 @@ function renderPresets(){
   $('#speedPresets').innerHTML = sp.map(v => `<button data-ps="${v}">${String(v).replace('.', ',')}<small>km/h</small></button>`).join('');
   $('#incPresets').innerHTML = ip.map(v => `<button data-pi="${v}">${v}<small>%</small></button>`).join('');
 }
+function renderBig(){
+  const live = ['running', 'paused', 'starting'].includes(S.status);
+  $('#btnBig').hidden = !driver || !live || big.open;
+  const el = $('#bigRun');
+  if (el.hidden === !big.open && !big.open) return;
+  el.hidden = !big.open;
+  document.body.style.overflow = big.open ? 'hidden' : '';
+  if (!big.open) return;
+  const vs = $('#vState'); $('#bState').className = vs.className; $('#bState span').textContent = vs.querySelector('span').textContent;
+  $('#bTime').textContent = hms(shown.elapsed());
+  $('#bSpeed').textContent = fr1(S.targetSpeed);
+  $('#bInc').textContent = frI(S.targetIncline);
+  // Valeur réelle du tapis, affichée seulement quand elle diffère de la consigne
+  $('#bSpReal').textContent = Math.abs(S.speed - S.targetSpeed) > 0.05 ? 'tapis ' + fr1(S.speed) : '';
+  $('#bIncReal').textContent = Math.abs(S.incline - S.targetIncline) > incStep() / 2 ? 'tapis ' + frI(S.incline) : '';
+  const stp = incStep() === 1 ? '1' : '0,5';
+  $('#bIncDn').textContent = '−' + stp; $('#bIncUp').textContent = '+' + stp;
+  $('#bDist').innerHTML = fr2(shown.distance()) + '<small>km</small>';
+  $('#bKcal').textContent = Math.round(shown.kcal());
+  if (S.speed > 0.5){ const p = 60 / S.speed; $('#bPace').textContent = Math.floor(p) + ':' + String(Math.round(p % 1 * 60) % 60).padStart(2, '0'); } else $('#bPace').textContent = '–';
+  const go = $('#bStart');
+  go.textContent = S.status === 'running' ? 'Pause' : S.status === 'paused' ? 'Reprendre' : 'Départ…';
+  go.className = S.status === 'running' ? 'pause' : 'go';
+  go.disabled = !driver || S.status === 'starting';
+  $('#bStop').disabled = !driver;
+  $('#bProg').hidden = !prog;
+  if (prog){
+    $('#bpName').textContent = prog.p.name;
+    $('#bpMeta').textContent = $('#pbMeta').textContent;
+    $('#bpNext').textContent = $('#pbNext').textContent;
+    $('#bpProfile').innerHTML = profileSVG(prog.p.segments, 600, 96, prog.t);
+  }
+}
 function renderInfo(){ $('#devInfo').innerHTML = Object.entries(S.info).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('') || '<dt>État</dt><dd>Non connecté</dd>'; }
 function render(){
   const chip = $('#connChip');
@@ -1256,11 +1380,11 @@ function render(){
   const st = $('#vState'); st.className = 'state ' + S.status;
   st.querySelector('span').textContent = S.status === 'starting' && S.countdown > 0 ? 'Départ dans ' + S.countdown : S.status === 'error' ? (S.errorMsg || 'Erreur') : boot && S.status === 'running' ? 'Mise en vitesse' : LABEL[S.status];
   $('#vSpeed').textContent = fr1(S.speed);
-  $('#vTarget').textContent = S.mode ? 'Consigne ' + fr1(S.targetSpeed) + ' km/h · ' + S.targetIncline + ' %' : '';
+  $('#vTarget').textContent = S.mode ? 'Consigne ' + fr1(S.targetSpeed) + ' km/h · ' + frI(S.targetIncline) + ' %' : '';
   const el = shown.elapsed(), di = shown.distance();
   $('#vTime').textContent = hms(el);
   $('#vDist').innerHTML = fr2(di) + '<small>km</small>';
-  $('#vInc').innerHTML = Math.round(S.incline) + '<small>%</small>';
+  $('#vInc').innerHTML = frI(S.incline) + '<small>%</small>';
   $('#vKcal').innerHTML = Math.round(shown.kcal()) + '<small>kcal</small>';
   if (S.speed > 0.5){ const p = 60 / S.speed; $('#vPace').innerHTML = Math.floor(p) + ':' + String(Math.round(p % 1 * 60) % 60).padStart(2, '0') + '<small>/km</small>'; } else $('#vPace').innerHTML = '–<small>/km</small>';
   $('#vAvg').innerHTML = fr1(el ? di / (el / 3600) : 0) + '<small>km/h</small>';
@@ -1269,7 +1393,7 @@ function render(){
   $('#mSteps').hidden = !S.m.steps;
   $('#mHr').hidden = !S.m.hr;
   $('#cSpeed').textContent = fr1(S.targetSpeed) + ' km/h';
-  $('#cInc').textContent = S.targetIncline + ' %';
+  $('#cInc').textContent = frI(S.targetIncline) + ' %';
   $$('#speedPresets button').forEach(b => { const on = +b.dataset.ps === S.targetSpeed; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
   $$('#incPresets button').forEach(b => { const on = +b.dataset.pi === S.targetIncline; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
 
@@ -1288,12 +1412,14 @@ function render(){
     $('#pbMeta').textContent = 'Étape ' + (prog.seg + 1) + '/' + prog.p.segments.length + ' · reste ' + hms(tot - prog.t);
     const nx = prog.p.segments[prog.seg + 1];
     const adj = prog.manual && prog.manual.seg === prog.seg ? 'Étape ajustée sur le tapis (' + fr1(prog.manual.s) + ' km/h, ' + prog.manual.i + ' %). ' : '';
-    const startTxt = S.status === 'starting' ? 'Le tapis démarre' + (S.countdown > 0 ? ' dans ' + S.countdown + ' s' : '') + ' à ' + fr1(S.targetSpeed) + ' km/h, ' + S.targetIncline + ' %.'
+    const startTxt = S.status === 'starting' ? 'Le tapis démarre' + (S.countdown > 0 ? ' dans ' + S.countdown + ' s' : '') + ' à ' + fr1(S.targetSpeed) + ' km/h, ' + frI(S.targetIncline) + ' %.'
       : boot ? 'Mise en vitesse : ' + fr1(S.speed) + ' → ' + fr1(S.targetSpeed) + ' km/h. Ce temps ne compte pas dans le programme.' : '';
     $('#pbNext').textContent = startTxt || adj + (nx ? 'Dans ' + hms(acc - prog.t) + ' : ' + fr1(nx.s) + ' km/h, ' + nx.i + ' %' : 'Dernière étape');
     $('#pbProfile').innerHTML = profileSVG(prog.p.segments, 600, 64, prog.t);
     const pc = Math.min(100, Math.round(prog.t / tot * 100)); $('#pbBar').style.width = pc + '%'; $('#pbXp').setAttribute('aria-valuenow', pc);
   } else pb.hidden = true;
+
+  renderBig();
 
   // Courbes en direct : vitesse et inclinaison sur deux graphiques, chacun sa propre échelle
   const sm = session ? session.samples : [], n = Math.max(sm.length - 1, 60);
@@ -1422,6 +1548,15 @@ $('#fileImport').addEventListener('change', async e => {
   toast(newS.length || newP ? 'Import terminé : ' + plural(newS.length, 'séance') + ' et ' + plural(newP, 'programme') + ' en plus' : 'Import terminé : tout était déjà là');
 });
 $('#pbQuit').addEventListener('click', () => { prog = null; render(); });
+$('#btnBig').addEventListener('click', () => { big.open = true; big.dismissed = false; render(); });
+$('#bClose').addEventListener('click', () => { big.open = false; big.dismissed = true; render(); });
+$('#bStart').addEventListener('click', startPause);
+$('#bStop').addEventListener('click', stopBelt);
+$('#bigRun').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.bs) setTarget(S.targetSpeed + +b.dataset.bs, S.targetIncline);
+  if (b.dataset.bi) setTarget(S.targetSpeed, S.targetIncline + +b.dataset.bi * incStep());
+});
 document.querySelector('.controls').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.ds) setTarget(S.targetSpeed + +b.dataset.ds, S.targetIncline);
