@@ -326,7 +326,7 @@ dialog.sheet::backdrop{background:rgba(46,42,36,.38)}
 
   <div id="notice" hidden></div>
   <div class="hugo" id="hugoCard" hidden role="region" aria-label="Programme proposé par Hugo">
-    <span class="who">Proposé par Hugo</span>
+    <span class="who" id="hgWho">Proposé par Hugo</span>
     <h3 id="hgName"></h3>
     <p class="num" id="hgFacts"></p>
     <p id="hgNote" hidden></p>
@@ -1018,7 +1018,7 @@ function setStatus(st){
 }
 function beginSession(){
   resetCounters();
-  session = { id: Date.now(), start: Date.now(), program: prog ? prog.p.name : null, pid: prog && prog.p.pid || null, plan: prog ? prog.p.segments : null, samples: [] };
+  session = { id: Date.now(), start: Date.now(), program: prog ? prog.p.name : null, pid: prog && (prog.pid || prog.p.pid) || null, plan: prog ? prog.p.segments : null, samples: [] };
 }
 function finishSession(){
   if (!session) return;
@@ -1088,10 +1088,10 @@ async function readHashProgram(){
   try { history.replaceState(null, '', location.pathname); } catch(e){}
   try {
     const p = cleanHugoProgram(await unpackCode(raw, 'FP1'));
-    const k = programs.findIndex(x => x.id === p.id);
-    if (k >= 0) programs[k] = p; else programs.unshift(p);
+    const same = programs.find(x => x.id !== p.id && progSig(x) === progSig(p)), k = programs.findIndex(x => x.id === p.id);
+    if (same) { hugoProg = Object.assign({}, same, { runPid: p.pid, note: p.note, par: p.par }); log('', 'Programme reçu identique à « ' + same.name + ' » : on lance celui-ci, sans doublon'); }
+    else { if (k >= 0) programs[k] = Object.assign({}, p, { done: programs[k].done || 0 }); else programs.unshift(Object.assign({ done: 0 }, p)); pruneHugo(); hugoProg = p; }
     saveProgs(); renderPrograms();
-    hugoProg = p;
     log('', 'Programme reçu de ' + p.par + ' : « ' + p.name + ' », ' + p.segments.length + ' étapes, ' + hms(progDur(p)));
     selectTab('seance');
     renderHugo();
@@ -1105,6 +1105,7 @@ function renderHugo(){
   if (!hugoProg){ c.hidden = true; return; }
   const p = hugoProg, maxS = Math.max(...p.segments.map(x => x.s)), maxI = Math.max(...p.segments.map(x => x.i));
   c.hidden = false;
+  $('#hgWho').textContent = 'Proposé par ' + (p.par || 'Hugo');
   $('#hgName').textContent = p.name;
   $('#hgFacts').textContent = hms(progDur(p)) + ' · ' + fr2(progDist(p)) + ' km · ' + p.segments.length + ' étapes · jusqu\'à ' + fr1(maxS) + ' km/h et ' + maxI + ' %';
   $('#hgNote').hidden = !p.note; $('#hgNote').textContent = p.note || '';
@@ -1120,7 +1121,7 @@ async function hugoGo(){
   }
   if (!driver) return;
   hugoProg = null; renderHugo();
-  launchProgram(p.id);
+  launchProgram(p.id, p.runPid || null);
 }
 // Code de séance pour Route des Vins : bilan, prévu (si programme) et relevé toutes les 10 s [t, vitesse, pente, pouls, étape du programme (−1 : hors programme)]
 function sessionPayload(s){
@@ -1391,7 +1392,7 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '23/11/2026 12:25';
+const APP_VERSION = '23/11/2026 16:00';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 
@@ -1408,11 +1409,11 @@ function profileSVG(segs, W, H, at){
   if (at != null){ const cx = Math.min(1, at / tot) * W; cur = `<rect x="0" y="0" width="${cx}" height="${H}" fill="var(--ink)" opacity=".06"/><line x1="${cx}" x2="${cx}" y1="0" y2="${H}" stroke="var(--ink)" stroke-width="2" vector-effect="non-scaling-stroke"/>`; }
   return `<path d="${sp}" fill="var(--data-line)" opacity=".22"/><path d="${top}" fill="none" stroke="var(--data-line)" stroke-width="2" vector-effect="non-scaling-stroke"/>${inc}${cur}`;
 }
-function launchProgram(id){
+function launchProgram(id, runPid){
   const p = programs.find(x => x.id === id); if (!p) return;
   if (!driver){ notice('<div><b>Aucun tapis connecté.</b> Connecte le tapis ou lance le mode démo avant de lancer un programme.</div>'); return; }
-  prog = { p, t: 0, seg: -1 };
-  if (session){ session.program = p.name; session.pid = p.pid || null; session.plan = p.segments; }
+  prog = { p, t: 0, seg: -1, pid: runPid || null };
+  if (session){ session.program = p.name; session.pid = runPid || p.pid || null; session.plan = p.segments; }
   selectTab('seance'); window.scrollTo(0, 0);
   applySegment(0);
   if (S.status !== 'running') driver.start();
@@ -1422,7 +1423,7 @@ function progTick(){
   if (!prog || S.status !== 'running' || boot) return;
   prog.t++;
   const tot = progDur(prog.p);
-  if (prog.t >= tot){ log('', 'Programme terminé'); stopBelt(); if (S.mode !== 'ftms' && S.mode !== 'demo') {} return; }
+  if (prog.t >= tot){ if (!prog.counted){ prog.counted = true; countDone(prog.p.id); } log('', 'Programme terminé'); stopBelt(); if (S.mode !== 'ftms' && S.mode !== 'demo') {} return; }
   let acc = 0, k = 0; for (; k < prog.p.segments.length; k++){ acc += prog.p.segments[k].d; if (prog.t < acc) break; }
   if (k !== prog.seg) applySegment(k);
 }
@@ -1453,13 +1454,25 @@ function renderEditor(){
 }
 function edSum(){ const el = $('#edSum'); if (el) el.textContent = hms(progDur(editing)) + ' · ≈ ' + fr2(progDist(editing)) + ' km'; const pf = $('#edProfile'); if (pf) pf.innerHTML = profileSVG(editing.segments, 600, 64); }
 
+// Programmes de Hugo : gardés dans la liste une fois terminés 2 fois (HUGO_KEEP) ; avant, en attente (8 au plus)
+const HUGO_KEEP = 2;
+const progSig = p => JSON.stringify((p.segments || []).map(x => [Math.round(+x.d), Math.round(+x.s * 10) / 10, Math.round(+x.i || 0)]));
+const progShown = p => !p.pid || (p.done || 0) >= HUGO_KEEP || (prog && prog.p.id === p.id);
+function pruneHugo(){ let n = 0; programs = programs.filter(p => progShown(p) || ++n <= 8); } // les plus récents sont en tête : le programme reçu est toujours gardé
+function countDone(id){
+  const p = programs.find(x => x.id === id); if (!p) return;
+  p.done = (p.done || 0) + 1; saveProgs();
+  if (p.pid && p.done === HUGO_KEEP){ log('', '« ' + p.name + ' » terminé ' + HUGO_KEEP + ' fois : gardé dans tes programmes'); toast('Programme de Hugo gardé dans tes programmes'); }
+  renderPrograms();
+}
 function renderPrograms(){
-  $('#progList').innerHTML = programs.map(p => `<article class="pcard" data-id="${p.id}">
+  const wait = programs.filter(p => !progShown(p)).length;
+  $('#progList').innerHTML = programs.filter(progShown).map(p => `<article class="pcard" data-id="${p.id}">
     <h3>${p.name.replace(/</g, '&lt;')}${p.par ? '<span class="by">' + String(p.par).replace(/</g, '&lt;') + '</span>' : ''}</h3>
     <svg class="profile" viewBox="0 0 600 64" preserveAspectRatio="none">${profileSVG(p.segments, 600, 64)}</svg>
     <div class="facts num"><span><b>${hms(progDur(p))}</b> durée</span><span><b>${fr2(progDist(p))}</b> km</span><span><b>${fr1(Math.max(...p.segments.map(s => s.s)))}</b> km/h max</span><span><b>${p.segments.length}</b> étapes</span></div>
     <div class="actions"><button class="btn primary small" data-a="run">Lancer</button><button class="btn small" data-a="edit">Modifier</button><button class="btn small" data-a="copy">Dupliquer</button><button class="btn small ghost" data-a="del">Supprimer</button></div>
-  </article>`).join('') || '<div class="empty">Aucun programme. Crée le premier avec « Nouveau programme ».</div>';
+  </article>`).join('') + (wait ? `<p class="ds-note">${wait} programme${wait > 1 ? 's' : ''} de Hugo en attente : ${wait > 1 ? 'ils rejoignent' : 'il rejoint'} la liste après ${HUGO_KEEP} séances terminées.</p>` : '') || '<div class="empty">Aucun programme. Crée le premier avec « Nouveau programme ».</div>';
 }
 
 /* ---------- Historique ---------- */
