@@ -75,6 +75,7 @@ code{font-family:var(--f-mono);font-size:.9em;background:var(--sunk);padding:1px
 .notice{background:rgba(142,59,70,.08);color:var(--ink);border-radius:var(--radius-m);padding:10px 12px;font-size:14px}
 .notice b{color:var(--ink)}
 .notice.err b{color:var(--bad)}
+.devpick{display:grid;gap:8px;margin-top:10px}.devpick .btn{width:100%}
 /* Programme proposé par Hugo (arrivé par lien) */
 .hugo{background:var(--card);border-radius:var(--radius-l);box-shadow:var(--shadow-card);padding:14px;display:grid;gap:10px;border-left:6px solid var(--green-d)}
 .hugo[hidden]{display:none}
@@ -837,6 +838,7 @@ function cancelConnect(){
   const att = conn; if (!att) return;
   att.cancelled = true; conn = null;
   log('', '— Connexion annulée');
+  if (att.pickDone) try { att.pickDone(null); } catch(e){}
   if (att.ctl) try { att.ctl.abort(); } catch(e){}
   if (att.drv) try { att.drv.disconnect(); } catch(e){}
   if (att.device) try { att.device.gatt.disconnect(); } catch(e){}
@@ -845,6 +847,9 @@ function cancelConnect(){
   setStatus('off'); render();
 }
 
+// Bouton « Connecter le tapis » (et « Connecter et démarrer ») :
+// 1. tapis déjà autorisé (getDevices) : un seul → connexion directe, plusieurs → liste dans la page ;
+// 2. sinon, sélecteur Bluetooth de Chrome (obligatoire pour un appareil jamais autorisé : Chrome ne laisse pas une page choisir seule).
 async function connect(){
   if (conn) return cancelConnect();
   log('', '— Clic sur « Connecter le tapis »');
@@ -852,17 +857,86 @@ async function connect(){
   const att = conn = { cancelled: false, device: null };
   try {
     notice('');
-    const all = settings.scan === 'all';
-    log('', 'Ouverture du sélecteur Bluetooth (' + (all ? 'tous les appareils' : 'filtre FS-, FitShow, FTMS') + ')…');
-    const opts = { optionalServices: [0xfff0, 0xffe0, 0x1826, 0x180a] };
-    if (all) opts.acceptAllDevices = true; else opts.filters = [{ namePrefix: 'FS-' }, { services: [0xfff0] }, { services: [0x1826] }];
-    const device = await navigator.bluetooth.requestDevice(opts);
+    let known = [];
+    if (navigator.bluetooth.getDevices){ try { known = await navigator.bluetooth.getDevices(); } catch(e){ log('err', 'Appareils autorisés illisibles : ' + e.name + ' : ' + e.message); } }
+    else log('', 'Appareils déjà autorisés : non lisibles dans ce Chrome (getDevices absent), sélecteur obligatoire');
     if (att.cancelled) return;
-    log('', 'Appareil choisi : ' + (device.name || '(sans nom)') + ' · id ' + device.id);
-    att.device = device; render();
-    await connectDevice(device, att);
+    const last = store.get('lastDevice', null);
+    const tapis = known.filter(d => (last && d.id === last.id) || /^FS-/i.test(d.name || '') || /fitshow|tread|tapis/i.test(d.name || ''));
+    const pool = tapis.length ? tapis : known;
+    if (known.length) log('', 'Appareils déjà autorisés : ' + known.map(d => d.name || d.id).join(', ') + (pool.length === 1 ? ' → connexion directe à ' + (pool[0].name || pool[0].id) : pool.length > 1 ? ' → liste' : ''));
+    let device = null;
+    if (pool.length === 1) device = pool[0];
+    else if (pool.length > 1){
+      render();
+      const pick = await pickDevice(pool, att);
+      if (att.cancelled || !pick) { if (!att.cancelled){ log('', 'Liste fermée sans choisir'); } return; }
+      if (pick !== 'other') device = pick;
+    }
+    if (device){
+      att.device = device; render();
+      const ok = await reachKnown(device, att, 6000);
+      if (ok || att.cancelled) return;
+      notice('<div><b>Le tapis ne répond pas.</b> Vérifie qu\'il est allumé et qu\'aucun autre téléphone (Foulée ou FitShow) n\'y est connecté.</div><div class="devpick"><button type="button" class="btn sky" id="btnRetryPick">Chercher le tapis dans la liste Bluetooth</button></div>', true);
+      const b = $('#btnRetryPick'); if (b) b.addEventListener('click', () => { notice(''); connectChooser(); }, { once: true });
+      return;
+    }
+    await chooseAndConnect(att);
   } catch(e){ if (!att.cancelled) connectError(e); }
   finally { if (conn === att) conn = null; render(); }
+}
+// Sélecteur Bluetooth de Chrome seul (depuis le bouton « Chercher… » : nouveau geste, donc sélecteur permis)
+async function connectChooser(){
+  if (conn) return;
+  const att = conn = { cancelled: false, device: null };
+  try { await chooseAndConnect(att); }
+  catch(e){ if (!att.cancelled) connectError(e); }
+  finally { if (conn === att) conn = null; render(); }
+}
+async function chooseAndConnect(att){
+  const all = settings.scan === 'all';
+  log('', 'Ouverture du sélecteur Bluetooth (' + (all ? 'tous les appareils' : 'filtre FS-, FitShow, FTMS') + ')…');
+  const opts = { optionalServices: [0xfff0, 0xffe0, 0x1826, 0x180a] };
+  if (all) opts.acceptAllDevices = true; else opts.filters = [{ namePrefix: 'FS-' }, { services: [0xfff0] }, { services: [0x1826] }];
+  const device = await navigator.bluetooth.requestDevice(opts);
+  if (att.cancelled) return;
+  log('', 'Appareil choisi : ' + (device.name || '(sans nom)') + ' · id ' + device.id);
+  att.device = device; render();
+  await connectDevice(device, att);
+}
+// Liste des appareils déjà autorisés, dans la page : renvoie l'appareil choisi, 'other' (sélecteur de Chrome) ou null
+function pickDevice(devs, att){
+  return new Promise(res => {
+    const n = $('#notice');
+    const done = v => { att.pickDone = null; n.hidden = true; n.innerHTML = ''; res(v); };
+    att.pickDone = done;
+    n.className = 'notice'; n.innerHTML = '<div><b>Plusieurs appareils connus.</b> Touche ton tapis.</div><div class="devpick"></div>'; n.hidden = false;
+    const box = n.querySelector('.devpick'), mk = (txt, cls, v) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ' + cls; b.textContent = txt; b.addEventListener('click', () => done(v)); box.append(b); };
+    devs.forEach(d => mk(d.name || 'Appareil sans nom', 'sky', d));
+    mk('Chercher un autre appareil', 'ghost', 'other');
+    mk('Annuler', 'ghost', null);
+  });
+}
+// Appareil déjà autorisé : attendre de « voir » ses annonces (Chrome le demande souvent), puis 2 essais de connexion
+async function reachKnown(dev, att, waitMs){
+  $('#devName').textContent = (dev.name || 'Tapis') + ' · recherche…';
+  if (dev.watchAdvertisements){
+    const seen = await new Promise(res => {
+      const ctl = att.ctl = new AbortController(), t = setTimeout(() => { res(false); ctl.abort(); }, waitMs);
+      ctl.signal.addEventListener('abort', () => { clearTimeout(t); res(att.cancelled ? null : false); });
+      dev.addEventListener('advertisementreceived', () => { clearTimeout(t); res(true); ctl.abort(); }, { once: true });
+      dev.watchAdvertisements({ signal: ctl.signal }).catch(e => { log('', 'Écoute des annonces impossible (' + e.name + ')'); clearTimeout(t); res(null); });
+    });
+    att.ctl = null;
+    if (att.cancelled) return false;
+    log('', seen ? 'Tapis détecté à proximité' : seen === false ? 'Pas d\'annonce du tapis en ' + Math.round(waitMs / 1000) + ' s (éteint ou déjà connecté ailleurs ?), essai quand même' : 'Essai direct');
+  }
+  for (let i = 1; i <= 2 && !driver && !att.cancelled; i++){
+    try { log('', 'Connexion à ' + (dev.name || dev.id) + ', essai ' + i + '/2'); await connectDevice(dev, att); }
+    catch(e){ if (att.cancelled) break; log('err', 'Connexion, essai ' + i + ' : ' + e.name + ' : ' + e.message); if (i < 2) await sleep(2500); }
+  }
+  if (!driver && !att.cancelled) $('#devName').textContent = dev.name || 'Tapis';
+  return !!driver;
 }
 // Connexion à un appareil déjà choisi : sert au bouton et à la connexion automatique
 async function connectDevice(device, att){
@@ -942,26 +1016,10 @@ async function autoConnect(){
   const att = conn = { cancelled: false, device: dev, auto: true };
   render();
   try {
-    $('#devName').textContent = (dev.name || 'Tapis') + ' · recherche…';
-    // Chrome demande souvent d'avoir « vu » l'appareil depuis l'ouverture de la page avant de s'y connecter
-    if (dev.watchAdvertisements){
-      const seen = await new Promise(res => {
-        const ctl = att.ctl = new AbortController(), t = setTimeout(() => { res(false); ctl.abort(); }, 10000);
-        ctl.signal.addEventListener('abort', () => { clearTimeout(t); res(att.cancelled ? null : false); });
-        dev.addEventListener('advertisementreceived', () => { clearTimeout(t); res(true); ctl.abort(); }, { once: true });
-        dev.watchAdvertisements({ signal: ctl.signal }).catch(e => { log('', 'Connexion auto : écoute des annonces impossible (' + e.name + ')'); clearTimeout(t); res(null); });
-      });
-      att.ctl = null;
-      if (att.cancelled) return;
-      log('', seen ? 'Connexion auto : tapis détecté à proximité' : seen === false ? 'Connexion auto : pas d\'annonce du tapis en 10 s (éteint ou déjà connecté ailleurs ?), essai quand même' : 'Connexion auto : essai direct');
-    }
-    for (let i = 1; i <= 2 && !driver && !att.cancelled; i++){
-      try { log('', 'Connexion auto à ' + (dev.name || dev.id) + ', essai ' + i + '/2'); await connectDevice(dev, att); }
-      catch(e){ if (att.cancelled) break; log('err', 'Connexion auto, essai ' + i + ' : ' + e.name + ' : ' + e.message); if (i < 2) await sleep(2500); }
-    }
+    await reachKnown(dev, att, 10000);
     if (att.cancelled) return;
     if (driver) toast('Tapis connecté automatiquement');
-    else { $('#devName').textContent = dev.name || 'Tapis'; log('', 'Connexion auto abandonnée : touche « Connecter le tapis »'); }
+    else log('', 'Connexion auto abandonnée : touche « Connecter le tapis »');
   } finally { if (conn === att) conn = null; render(); }
 }
 // Oublie les tapis autorisés : la connexion auto s'arrête, la prochaine connexion repasse par le sélecteur
@@ -1132,6 +1190,16 @@ function sessionPayload(s){
     denivele: g('elevation') != null ? Math.round(g('elevation')) : null, pas: s.steps || null, fcMoy: g('hrAvg') || null, fcMax: g('hrMax') || null,
     source: s.source || null, ajustements: s.adjust || [], releve: (s.samples || []).map(x => [x[0], r1(x[1]), r1(x[2]), x[3] || 0, x[4] != null ? x[4] : -1]) };
 }
+// Version courte pour le lien : le relevé toutes les 10 s est résumé par étape du programme (vitesse et pente médianes, pouls moyen),
+// trois lignes identiques par étape pour que Route des Vins lise la tenue réelle comme avec le relevé complet. Le code complet reste copié.
+function sessionPayloadLite(s){
+  const o = sessionPayload(s), med = a => { const b = a.slice().sort((x, y) => x - y); return b.length ? b[Math.floor(b.length / 2)] : 0; };
+  const rel = [], steps = [...new Set(o.releve.map(r => r[4]).filter(k => k >= 0))].sort((a, b) => a - b);
+  steps.forEach(k => { const rows = o.releve.filter(r => r[4] === k && r[1] > 0); if (!rows.length) return;
+    const hr = rows.map(r => r[3]).filter(v => v > 0), row = [rows[0][0], med(rows.map(r => r[1])), med(rows.map(r => r[2])), hr.length ? Math.round(hr.reduce((a, v) => a + v, 0) / hr.length) : 0, k];
+    rel.push(row, row.slice(), row.slice()); });
+  return Object.assign(o, { lite: 1, releve: rel, ajustements: o.ajustements.slice(0, 40) });
+}
 let sumCur = null;
 async function sendToRdv(){
   if (!sumCur) return;
@@ -1141,8 +1209,9 @@ async function sendToRdv(){
   try { await navigator.clipboard.writeText(code); copied = true; } catch(e){}
   log('', 'Séance envoyée à Route des Vins : code de ' + code.length + ' caractères' + (copied ? ', copié' : ', copie refusée'));
   // La séance part aussi dans le lien : claude.ai ne transmet à la page qu'un « #nom » simple (lettres, chiffres, tirets),
-  // donc FS1z.<base64url> devient #fs1z-<base64url où « - » s'écrit « -0 » et « _ » s'écrit « -1 »>. Route des Vins l'importe seule.
-  const m = code.match(/^FS1([zj])\.(.+)$/), tag = m ? '#fs1' + m[1] + '-' + m[2].replace(/[-_]/g, c => c === '-' ? '-0' : '-1') : '';
+  // donc la version courte FS1z.<base64url> devient #fs1z-<base64url où « - » s'écrit « -0 » et « _ » s'écrit « -1 »>. Route des Vins l'importe seule.
+  const lite = await packCode('FS1', sessionPayloadLite(sumCur));
+  const m = lite.match(/^FS1([zj])\.(.+)$/), tag = m ? '#fs1' + m[1] + '-' + m[2].replace(/[-_]/g, c => c === '-' ? '-0' : '-1') : '';
   const url = tag && tag.length < 30000 ? RDV_URL + tag : RDV_URL;
   $('#sumSendMsg').textContent = copied ? 'Route des Vins s\'ouvre et ajoute la séance toute seule. Si rien ne se passe, touche « Importer ma séance Foulée » et colle : le code est copié.' : 'Route des Vins s\'ouvre et ajoute la séance toute seule. Si rien ne se passe, sélectionne le code ci-dessous, copie-le et colle-le dans « Importer ma séance Foulée ».';
   let w = null; try { w = window.open(url, '_blank'); } catch(e){}
