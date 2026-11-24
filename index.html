@@ -1048,7 +1048,7 @@ function finishSession(){
 }
 
 /* ---------- Pont avec Route des Vins ----------
-   Codes : « FP1 » = programme (Hugo → Foulée, dans le lien #prog=…), « FS1 » = séance (Foulée → Route des Vins, copié).
+   Codes : « FP1 » = programme (Hugo → Foulée, dans le lien #prog=…), « FS1 » = séance (Foulée → Route des Vins, dans le lien #fs1z-… et copié en secours).
    Suite : z = JSON compressé (deflate-raw), j = JSON brut ; puis « . » et le contenu en base64url. */
 const RDV_URL = 'https://claude.ai/artifact/5W78k4ydrqez9dnNmCWDY6';
 const b64u = bytes => { let t = ''; for (let k = 0; k < bytes.length; k += 0x8000) t += String.fromCharCode.apply(null, bytes.subarray(k, k + 0x8000)); return btoa(t).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
@@ -1139,10 +1139,16 @@ async function sendToRdv(){
   $('#sumCode').value = code; $('#sumSendBox').hidden = false;
   let copied = false;
   try { await navigator.clipboard.writeText(code); copied = true; } catch(e){}
-  $('#sumSendMsg').textContent = copied ? 'Code copié. Dans Route des Vins, touche « Importer ma séance Foulée ».' : 'Copie automatique refusée : sélectionne le code ci-dessous et copie-le, puis colle-le dans Route des Vins.';
   log('', 'Séance envoyée à Route des Vins : code de ' + code.length + ' caractères' + (copied ? ', copié' : ', copie refusée'));
-  if (copied){ let w = null; try { w = window.open(RDV_URL, '_blank'); } catch(e){} log(w ? '' : 'err', 'Ouverture de Route des Vins : ' + (w ? 'demandée' : 'bloquée par le navigateur')); }
-  else { $('#sumCode').focus(); $('#sumCode').select(); }
+  // La séance part aussi dans le lien : claude.ai ne transmet à la page qu'un « #nom » simple (lettres, chiffres, tirets),
+  // donc FS1z.<base64url> devient #fs1z-<base64url où « - » s'écrit « -0 » et « _ » s'écrit « -1 »>. Route des Vins l'importe seule.
+  const m = code.match(/^FS1([zj])\.(.+)$/), tag = m ? '#fs1' + m[1] + '-' + m[2].replace(/[-_]/g, c => c === '-' ? '-0' : '-1') : '';
+  const url = tag && tag.length < 30000 ? RDV_URL + tag : RDV_URL;
+  $('#sumSendMsg').textContent = copied ? 'Route des Vins s\'ouvre et ajoute la séance toute seule. Si rien ne se passe, touche « Importer ma séance Foulée » et colle : le code est copié.' : 'Route des Vins s\'ouvre et ajoute la séance toute seule. Si rien ne se passe, sélectionne le code ci-dessous, copie-le et colle-le dans « Importer ma séance Foulée ».';
+  let w = null; try { w = window.open(url, '_blank'); } catch(e){}
+  log(w ? '' : 'err', 'Ouverture de Route des Vins' + (url !== RDV_URL ? ' avec la séance dans le lien (' + tag.length + ' caractères)' : ' sans la séance (code trop long)') + ' : ' + (w ? 'demandée' : 'bloquée par le navigateur'));
+  if (!w){ $('#sumSendMsg').textContent = 'Le navigateur a bloqué l\'ouverture. ' + (copied ? 'Le code est copié : colle-le dans « Importer ma séance Foulée ».' : 'Copie le code ci-dessous et colle-le dans « Importer ma séance Foulée ».'); }
+  if (!copied){ $('#sumCode').focus(); $('#sumCode').select(); }
 }
 
 /* ---------- Bilan d'une séance ---------- */
