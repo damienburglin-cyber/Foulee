@@ -881,7 +881,11 @@ async function connect(){
       const b = $('#btnRetryPick'); if (b) b.addEventListener('click', () => { notice(''); connectChooser(); }, { once: true });
       return;
     }
+    const forgot = !!(last && navigator.bluetooth.getDevices);
+    if (forgot) log('', 'Chrome n\'a rendu aucun tapis déjà autorisé (' + known.length + ' appareil' + (known.length > 1 ? 's' : '') + ') : il ne garde pas l\'autorisation d\'une visite à l\'autre');
     await chooseAndConnect(att);
+    if (forgot && driver && !store.get('permHint', false)){ store.set('permHint', true);
+      notice('<div><b>Chrome oublie le tapis à chaque visite</b>, d\'où sa liste. Pour une connexion directe : ouvre <code>chrome://flags</code>, active « Use the new permissions backend for Web Bluetooth », relance Chrome, puis connecte le tapis une fois.</div>'); }
   } catch(e){ if (!att.cancelled) connectError(e); }
   finally { if (conn === att) conn = null; render(); }
 }
@@ -1106,7 +1110,7 @@ function finishSession(){
 }
 
 /* ---------- Pont avec Route des Vins ----------
-   Codes : « FP1 » = programme (Hugo → Foulée, dans le lien #prog=…), « FS1 » = séance (Foulée → Route des Vins, dans le lien #fs1z-… et copié en secours).
+   Codes : « FP1 » = programme (Hugo → Foulée, dans le lien #prog=…), « FS1 » = séance (Foulée → Route des Vins, copié puis collé : claude.ai ne le laisse pas passer dans le lien).
    Suite : z = JSON compressé (deflate-raw), j = JSON brut ; puis « . » et le contenu en base64url. */
 const RDV_URL = 'https://claude.ai/artifact/5W78k4ydrqez9dnNmCWDY6';
 const b64u = bytes => { let t = ''; for (let k = 0; k < bytes.length; k += 0x8000) t += String.fromCharCode.apply(null, bytes.subarray(k, k + 0x8000)); return btoa(t).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
@@ -1190,16 +1194,6 @@ function sessionPayload(s){
     denivele: g('elevation') != null ? Math.round(g('elevation')) : null, pas: s.steps || null, fcMoy: g('hrAvg') || null, fcMax: g('hrMax') || null,
     source: s.source || null, ajustements: s.adjust || [], releve: (s.samples || []).map(x => [x[0], r1(x[1]), r1(x[2]), x[3] || 0, x[4] != null ? x[4] : -1]) };
 }
-// Version courte pour le lien : le relevé toutes les 10 s est résumé par étape du programme (vitesse et pente médianes, pouls moyen),
-// trois lignes identiques par étape pour que Route des Vins lise la tenue réelle comme avec le relevé complet. Le code complet reste copié.
-function sessionPayloadLite(s){
-  const o = sessionPayload(s), med = a => { const b = a.slice().sort((x, y) => x - y); return b.length ? b[Math.floor(b.length / 2)] : 0; };
-  const rel = [], steps = [...new Set(o.releve.map(r => r[4]).filter(k => k >= 0))].sort((a, b) => a - b);
-  steps.forEach(k => { const rows = o.releve.filter(r => r[4] === k && r[1] > 0); if (!rows.length) return;
-    const hr = rows.map(r => r[3]).filter(v => v > 0), row = [rows[0][0], med(rows.map(r => r[1])), med(rows.map(r => r[2])), hr.length ? Math.round(hr.reduce((a, v) => a + v, 0) / hr.length) : 0, k];
-    rel.push(row, row.slice(), row.slice()); });
-  return Object.assign(o, { lite: 1, releve: rel, ajustements: o.ajustements.slice(0, 40) });
-}
 let sumCur = null;
 async function sendToRdv(){
   if (!sumCur) return;
@@ -1208,15 +1202,12 @@ async function sendToRdv(){
   let copied = false;
   try { await navigator.clipboard.writeText(code); copied = true; } catch(e){}
   log('', 'Séance envoyée à Route des Vins : code de ' + code.length + ' caractères' + (copied ? ', copié' : ', copie refusée'));
-  // La séance part aussi dans le lien : claude.ai ne transmet à la page qu'un « #nom » simple (lettres, chiffres, tirets),
-  // donc la version courte FS1z.<base64url> devient #fs1z-<base64url où « - » s'écrit « -0 » et « _ » s'écrit « -1 »>. Route des Vins l'importe seule.
-  const lite = await packCode('FS1', sessionPayloadLite(sumCur));
-  const m = lite.match(/^FS1([zj])\.(.+)$/), tag = m ? '#fs1' + m[1] + '-' + m[2].replace(/[-_]/g, c => c === '-' ? '-0' : '-1') : '';
-  const url = tag && tag.length < 30000 ? RDV_URL + tag : RDV_URL;
-  $('#sumSendMsg').textContent = copied ? 'Route des Vins s\'ouvre et ajoute la séance toute seule. Si rien ne se passe, touche « Importer ma séance Foulée » et colle : le code est copié.' : 'Route des Vins s\'ouvre et ajoute la séance toute seule. Si rien ne se passe, sélectionne le code ci-dessous, copie-le et colle-le dans « Importer ma séance Foulée ».';
+  // claude.ai ne transmet pas la séance dans le lien (vérifié) : seul « #seance-foulee » est tenté, pour que Route des Vins ouvre son encadré de collage.
+  const url = RDV_URL + '#seance-foulee';
+  $('#sumSendMsg').textContent = copied ? 'Code copié. Dans Route des Vins, encadré « Ta séance Foulée » en haut de l\'accueil : appui long, puis Coller.' : 'Copie automatique refusée : sélectionne le code ci-dessous et copie-le, puis colle-le dans l\'encadré « Ta séance Foulée » de Route des Vins.';
   let w = null; try { w = window.open(url, '_blank'); } catch(e){}
-  log(w ? '' : 'err', 'Ouverture de Route des Vins' + (url !== RDV_URL ? ' avec la séance dans le lien (' + tag.length + ' caractères)' : ' sans la séance (code trop long)') + ' : ' + (w ? 'demandée' : 'bloquée par le navigateur'));
-  if (!w){ $('#sumSendMsg').textContent = 'Le navigateur a bloqué l\'ouverture. ' + (copied ? 'Le code est copié : colle-le dans « Importer ma séance Foulée ».' : 'Copie le code ci-dessous et colle-le dans « Importer ma séance Foulée ».'); }
+  log(w ? '' : 'err', 'Ouverture de Route des Vins : ' + (w ? 'demandée' : 'bloquée par le navigateur'));
+  if (!w){ $('#sumSendMsg').textContent = 'Le navigateur a bloqué l\'ouverture. ' + (copied ? 'Le code est copié : reviens sur Route des Vins et colle-le dans l\'encadré « Ta séance Foulée ».' : 'Copie le code ci-dessous et colle-le dans l\'encadré « Ta séance Foulée » de Route des Vins.'); }
   if (!copied){ $('#sumCode').focus(); $('#sumCode').select(); }
 }
 
