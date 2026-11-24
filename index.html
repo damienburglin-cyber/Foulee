@@ -362,7 +362,8 @@ dialog.sheet::backdrop{background:rgba(46,42,36,.38)}
         <div class="metric"><span class="label">Temps</span><span class="v num" id="vTime">00:00</span></div>
         <div class="metric"><span class="label">Distance</span><span class="v num" id="vDist">0,00<small>km</small></span></div>
         <div class="metric inc"><span class="label">Inclinaison</span><span class="v num" id="vInc">0<small>%</small></span></div>
-        <div class="metric"><span class="label">Calories</span><span class="v num" id="vKcal">0<small>kcal</small></span></div>
+        <div class="metric"><span class="label">Calories brutes</span><span class="v num" id="vKcal">0<small>kcal</small></span></div>
+        <div class="metric"><span class="label">Calories nettes</span><span class="v num" id="vKcalNet">0<small>kcal</small></span></div>
         <div class="metric"><span class="label">Allure</span><span class="v num" id="vPace">–<small>/km</small></span></div>
         <div class="metric"><span class="label">Vitesse moy.</span><span class="v num" id="vAvg">0,0<small>km/h</small></span></div>
         <div class="metric" id="mSteps" hidden><span class="label">Pas</span><span class="v num" id="vSteps">–</span></div>
@@ -423,7 +424,7 @@ dialog.sheet::backdrop{background:rgba(46,42,36,.38)}
     <div class="cols">
       <div class="card">
         <h2>Réglages</h2>
-        <div class="field"><label class="label" for="setWeight">Poids (kg)</label><input id="setWeight" type="number" min="30" max="200" step="1"><span class="hint">Sert à estimer les calories quand le tapis ne les donne pas.</span></div>
+        <div class="field"><label class="label" for="setWeight">Poids (kg)</label><input id="setWeight" type="number" min="30" max="200" step="1"><span class="hint">Sert à estimer les calories quand le tapis ne les donne pas, et aux calories nettes : brutes moins ce que tu brûles au repos sur le même temps.</span></div>
         <div class="field"><label class="label" for="setKcal">Calories affichées</label>
           <select id="setKcal">
             <option value="machine10">Tapis (valeur ÷ 10)</option>
@@ -517,7 +518,7 @@ dialog.sheet::backdrop{background:rgba(46,42,36,.38)}
   </div>
   <div class="big-metrics">
     <div><span>Distance</span><b class="num" id="bDist">0,00<small>km</small></b></div>
-    <div><span>Calories</span><b class="num" id="bKcal">0</b></div>
+    <div><span>Kcal brut · net</span><b class="num" id="bKcal">0</b></div>
     <div><span>Allure</span><b class="num" id="bPace">–</b></div>
   </div>
   <div class="run">
@@ -609,6 +610,10 @@ function kcalPerMin(speed, incline){
   const vo2 = speed < 8 ? 3.5 + 0.1 * v + 1.8 * v * g : 3.5 + 0.2 * v + 0.9 * v * g;
   return vo2 * settings.weight / 1000 * 5;
 }
+// Calories nettes = brutes − ce que le corps dépense au repos sur la même durée (1 MET : 3,5 ml d'O2/kg/min, 5 kcal par litre)
+const restKcal = sec => 3.5 * settings.weight / 1000 * 5 * (sec || 0) / 60;
+const netKcal = (kcal, sec) => Math.max(0, (kcal || 0) - restKcal(sec));
+const sessNet = s => s.kcalNet != null ? s.kcalNet : netKcal(s.kcal, s.duration);
 const shown = {
   elapsed: () => S.m.elapsed ?? S.loc.elapsed,
   distance: () => S.m.distance ?? S.loc.distance,
@@ -616,7 +621,8 @@ const shown = {
     if (settings.kcal === 'estimate' || S.m.kcal == null || S.mode === 'demo') return S.loc.kcal;
     if (S.mode === 'fitshow' && settings.kcal === 'machine10') return S.m.kcal / 10;
     return S.m.kcal;
-  }
+  },
+  kcalNet: () => netKcal(shown.kcal(), shown.elapsed())
 };
 
 /* ---------- Pilote FitShow (service FFF0) ---------- */
@@ -1092,7 +1098,7 @@ function finishSession(){
       const bootS = session.samples.findIndex(x => x[4] >= 0);
       log('', 'Bilan programme : ' + done + '/' + session.plan.length + ' étapes faites' + (prog && prog.t >= progDur(prog.p) - 1 ? ', programme terminé' : ', arrêté avant la fin') + ' · secondes par étape ' + per.join('/') + ' (prévu ' + session.plan.map(x => x.d).join('/') + ')' + (bootS > 0 ? ' · mise en vitesse ' + bootS + ' s' : '') + ' · ' + (session.adjust || []).length + ' réglage(s) manuel(s)');
     }
-    const s = { id: session.id, start: session.start, end: Date.now(), program: session.program, duration: el, distance: shown.distance(), kcal: shown.kcal(),
+    const s = { id: session.id, start: session.start, end: Date.now(), program: session.program, duration: el, distance: shown.distance(), kcal: shown.kcal(), kcalNet: shown.kcalNet(),
       pid: session.pid || null, plan: session.plan || null, adjust: session.adjust || [],
       maxSpeed: st.maxSpeed, avgIncline: st.avgIncline, maxIncline: st.maxIncline, elevation: st.elevation,
       steps: S.m.steps || null, hrAvg: st.hrAvg, hrMax: st.hrMax, source: S.mode,
@@ -1191,7 +1197,7 @@ function sessionPayload(s){
   return { v: 1, app: 'Foulee', id: s.id, debut: s.start, fin: s.end || null, programme: s.program || null, pid: s.pid || null, prevu: s.plan || null,
     duree: Math.round(s.duration), distance: Math.round(s.distance * 1000) / 1000, kcal: Math.round(s.kcal || 0),
     vitesseMoy: r1(s.avgSpeed), vitesseMax: r1(g('maxSpeed')), penteMoy: r1(g('avgIncline')), penteMax: r1(g('maxIncline')),
-    denivele: g('elevation') != null ? Math.round(g('elevation')) : null, pas: s.steps || null, fcMoy: g('hrAvg') || null, fcMax: g('hrMax') || null,
+    denivele: g('elevation') != null ? Math.round(g('elevation')) : null, pas: s.steps || null, fcMoy: g('hrAvg') || null, fcMax: g('hrMax') || null, kcalNet: Math.round(sessNet(s)),
     source: s.source || null, ajustements: s.adjust || [], releve: (s.samples || []).map(x => [x[0], r1(x[1]), r1(x[2]), x[3] || 0, x[4] != null ? x[4] : -1]) };
 }
 let sumCur = null;
@@ -1246,7 +1252,7 @@ function showSummary(s, justEnded){
     ['Durée', hms(s.duration)], ['Distance', fr2(s.distance) + ' km'],
     ['Vitesse moyenne', fr1(s.avgSpeed) + ' km/h'], ['Vitesse max', g('maxSpeed') != null ? fr1(g('maxSpeed')) + ' km/h' : null],
     ['Pente moyenne', inc(g('avgIncline'))], ['Pente max', g('maxIncline') != null ? Math.round(g('maxIncline')) + ' %' : null],
-    ['Dénivelé positif', g('elevation') != null ? Math.round(g('elevation')) + ' m' : null], ['Calories', Math.round(s.kcal) + ' kcal']
+    ['Dénivelé positif', g('elevation') != null ? Math.round(g('elevation')) + ' m' : null], ['Calories brutes', Math.round(s.kcal) + ' kcal'], ['Calories nettes', Math.round(sessNet(s)) + ' kcal']
   ];
   const more = [
     ['Allure moyenne', pace], ['Pas', s.steps ? s.steps.toLocaleString('fr-FR') : null],
@@ -1373,7 +1379,23 @@ function noteAdjust(origin){
   const step = prog && !boot ? prog.seg : -1, pl = prog && step >= 0 ? prog.p.segments[step] : null;
   log('', 'Réglage manuel (' + origin + ') : ' + fr1(S.targetSpeed) + ' km/h, ' + S.targetIncline + ' %' + (pl ? ' · étape ' + (step + 1) + ' prévue à ' + fr1(pl.s) + ' km/h, ' + pl.i + ' %' : '') + (session ? ' · à ' + hms(shown.elapsed()) : ' · hors séance'));
   if (session) (session.adjust = session.adjust || []).push([Math.round(shown.elapsed()), step, S.targetSpeed, S.targetIncline, origin === 'tapis' ? 'tapis' : 'appli']);
+  if (prog && step >= 0) (prog.edits = prog.edits || []).push({ t: prog.t, seg: step, s: S.targetSpeed, i: S.targetIncline });
 }
+// Profil réellement suivi : chaque réglage à la main remplace la consigne de son étape à partir de la seconde où il a été fait
+// (jusqu'à la fin de l'étape : l'étape suivante repart sur le programme). null si aucun réglage.
+function progEffective(pr){
+  const ed = pr.edits || []; if (!ed.length) return null;
+  const out = []; let t0 = 0;
+  pr.p.segments.forEach((sg, k) => {
+    const t1 = t0 + sg.d; let cur = t0, v = { s: sg.s, i: sg.i };
+    ed.filter(e => e.seg === k).sort((a, b) => a.t - b.t).forEach(e => { const t = Math.min(t1, Math.max(t0, e.t)); if (t > cur) out.push({ d: t - cur, s: v.s, i: v.i }); cur = t; v = { s: e.s, i: e.i }; });
+    if (t1 > cur) out.push({ d: t1 - cur, s: v.s, i: v.i });
+    t0 = t1;
+  });
+  return out;
+}
+// Profil du programme en cours : consignes réelles, et en pointillés le programme prévu là où il a été modifié
+function progProfile(W, H){ const e = progEffective(prog); return e ? profileSVG(e, W, H, prog.t, prog.p.segments) : profileSVG(prog.p.segments, W, H, prog.t); }
 function adoptFromBelt(){
   const sp = Math.round(S.speed * 10) / 10, inc = Math.round(S.incline / incStep()) * incStep();
   if (sp === S.targetSpeed && inc === S.targetIncline) return;
@@ -1462,9 +1484,11 @@ const APP_VERSION = '23/11/2026 21:00';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 
-function profileSVG(segs, W, H, at){
+function profileSVG(segs, W, H, at, plan){
   // Vitesse en aire data-line en haut ; l'inclinaison a sa propre bande de 12 px en bas (pas de double échelle)
-  const tot = segs.reduce((a, s) => a + s.d, 0) || 1, maxS = Math.max(4, ...segs.map(s => s.s)), maxI = Math.max(6, ...segs.map(s => s.i)), HS = H - 16;
+  // plan : programme prévu, tracé en pointillés quand segs est le profil modifié à la main
+  const all = plan ? segs.concat(plan) : segs;
+  const tot = segs.reduce((a, s) => a + s.d, 0) || 1, maxS = Math.max(4, ...all.map(s => s.s)), maxI = Math.max(6, ...all.map(s => s.i)), HS = H - 16;
   let x = 0, sp = `M0 ${HS}`, top = '', inc = '';
   segs.forEach((s, k) => { const x2 = x + s.d / tot * W, y = HS - 2 - s.s / maxS * (HS - 6), hi = s.i / maxI * 12;
     sp += ` L${x} ${y} L${x2} ${y}`; top += (k ? ' L' : 'M') + `${x} ${y} L${x2} ${y}`;
@@ -1473,7 +1497,10 @@ function profileSVG(segs, W, H, at){
   sp += ` L${W} ${HS} Z`;
   let cur = '';
   if (at != null){ const cx = Math.min(1, at / tot) * W; cur = `<rect x="0" y="0" width="${cx}" height="${H}" fill="var(--ink)" opacity=".06"/><line x1="${cx}" x2="${cx}" y1="0" y2="${H}" stroke="var(--ink)" stroke-width="2" vector-effect="non-scaling-stroke"/>`; }
-  return `<path d="${sp}" fill="var(--data-line)" opacity=".22"/><path d="${top}" fill="none" stroke="var(--data-line)" stroke-width="2" vector-effect="non-scaling-stroke"/>${inc}${cur}`;
+  let ghost = '';
+  if (plan){ let gx = 0, gp = ''; plan.forEach((s, k) => { const x2 = gx + s.d / tot * W, y = HS - 2 - s.s / maxS * (HS - 6); gp += (k ? ' L' : 'M') + `${gx} ${y} L${x2} ${y}`; gx = x2; });
+    ghost = `<path d="${gp}" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>`; }
+  return `<path d="${sp}" fill="var(--data-line)" opacity=".22"/>${ghost}<path d="${top}" fill="none" stroke="var(--data-line)" stroke-width="2" vector-effect="non-scaling-stroke"/>${inc}${cur}`;
 }
 function launchProgram(id, runPid){
   const p = programs.find(x => x.id === id); if (!p) return;
@@ -1563,7 +1590,7 @@ function renderHistory(){
   const sum = (a, f) => a.reduce((x, s) => x + (s[f] || 0), 0);
   $('#totals').innerHTML = [
     ['Séances (7 j)', w.length, ''], ['Distance (7 j)', fr2(sum(w, 'distance')), 'km'],
-    ['Temps (7 j)', hms(sum(w, 'duration')), ''], ['Calories (7 j)', Math.round(sum(w, 'kcal')), 'kcal']
+    ['Temps (7 j)', hms(sum(w, 'duration')), ''], ['Calories brutes (7 j)', Math.round(sum(w, 'kcal')), 'kcal'], ['Calories nettes (7 j)', Math.round(w.reduce((x, s) => x + sessNet(s), 0)), 'kcal']
   ].map(([l, v, u]) => `<div class="total"><span class="label">${l}</span><div class="v num">${v}${u ? `<small style="font:700 13px var(--font-body);color:var(--muted);margin-left:var(--space-1)">${u}</small>` : ''}</div></div>`).join('');
   $('#btnClearEx').hidden = !h.some(s => s.example);
   $('#histList').innerHTML = h.length ? h.map(s => {
@@ -1573,7 +1600,7 @@ function renderHistory(){
       <div class="c"><small>Durée</small>${hms(s.duration)}</div>
       <div class="c"><small>Distance</small>${fr2(s.distance)} km</div>
       <div class="c"><small>Moy.</small>${fr1(s.avgSpeed)} km/h</div>
-      <div class="c"><small>Calories</small>${Math.round(s.kcal)} kcal</div>
+      <div class="c"><small>Kcal brut · net</small>${Math.round(s.kcal)} · ${Math.round(sessNet(s))}</div>
       <svg class="spark" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true">${sparkSVG(s.samples, 120, 32)}</svg>
       <button class="iconbtn del" data-a="del" title="Supprimer la séance" aria-label="Supprimer la séance">${ICON.x}</button></div>`;
   }).join('') : '<div class="empty">Aucune séance pour l\'instant. Chaque séance de plus de 20 secondes s\'enregistre ici à l\'arrêt du tapis.</div>';
@@ -1603,7 +1630,7 @@ function renderBig(){
   $('#bSpReal').textContent = Math.abs(S.speed - S.targetSpeed) > 0.05 ? 'tapis ' + fr1(S.speed) : '';
   $('#bIncReal').textContent = Math.abs(S.incline - S.targetIncline) > incStep() / 2 ? 'tapis ' + frI(S.incline) : '';
   $('#bDist').innerHTML = fr2(shown.distance()) + '<small>km</small>';
-  $('#bKcal').textContent = Math.round(shown.kcal());
+  $('#bKcal').textContent = Math.round(shown.kcal()) + ' · ' + Math.round(shown.kcalNet());
   if (S.speed > 0.5){ const p = 60 / S.speed; $('#bPace').textContent = Math.floor(p) + ':' + String(Math.round(p % 1 * 60) % 60).padStart(2, '0'); } else $('#bPace').textContent = '–';
   const go = $('#bStart');
   go.textContent = S.status === 'running' ? 'Pause' : S.status === 'paused' ? 'Reprendre' : 'Départ…';
@@ -1615,7 +1642,7 @@ function renderBig(){
     $('#bpName').textContent = prog.p.name;
     $('#bpMeta').textContent = $('#pbMeta').textContent;
     $('#bpNext').textContent = $('#pbNext').textContent;
-    $('#bpProfile').innerHTML = profileSVG(prog.p.segments, 600, 96, prog.t);
+    $('#bpProfile').innerHTML = progProfile(600, 96);
   }
 }
 function renderInfo(){ $('#devInfo').innerHTML = Object.entries(S.info).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('') || '<dt>État</dt><dd>Non connecté</dd>'; }
@@ -1637,6 +1664,7 @@ function render(){
   $('#vDist').innerHTML = fr2(di) + '<small>km</small>';
   $('#vInc').innerHTML = frI(S.incline) + '<small>%</small>';
   $('#vKcal').innerHTML = Math.round(shown.kcal()) + '<small>kcal</small>';
+  $('#vKcalNet').innerHTML = Math.round(shown.kcalNet()) + '<small>kcal</small>';
   if (S.speed > 0.5){ const p = 60 / S.speed; $('#vPace').innerHTML = Math.floor(p) + ':' + String(Math.round(p % 1 * 60) % 60).padStart(2, '0') + '<small>/km</small>'; } else $('#vPace').innerHTML = '–<small>/km</small>';
   $('#vAvg').innerHTML = fr1(el ? di / (el / 3600) : 0) + '<small>km/h</small>';
   $('#vSteps').textContent = S.m.steps ? S.m.steps.toLocaleString('fr-FR') : '–';
@@ -1666,7 +1694,7 @@ function render(){
     const startTxt = S.status === 'starting' ? 'Le tapis démarre' + (S.countdown > 0 ? ' dans ' + S.countdown + ' s' : '') + ' à ' + fr1(S.targetSpeed) + ' km/h, ' + frI(S.targetIncline) + ' %.'
       : boot ? 'Mise en vitesse : ' + fr1(S.speed) + ' → ' + fr1(S.targetSpeed) + ' km/h. Ce temps ne compte pas dans le programme.' : '';
     $('#pbNext').textContent = startTxt || adj + (nx ? 'Dans ' + hms(acc - prog.t) + ' : ' + fr1(nx.s) + ' km/h, ' + nx.i + ' %' : 'Dernière étape');
-    $('#pbProfile').innerHTML = profileSVG(prog.p.segments, 600, 64, prog.t);
+    $('#pbProfile').innerHTML = progProfile(600, 64);
     const pc = Math.min(100, Math.round(prog.t / tot * 100)); $('#pbBar').style.width = pc + '%'; $('#pbXp').setAttribute('aria-valuenow', pc);
   } else pb.hidden = true;
 
