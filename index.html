@@ -482,6 +482,7 @@ canvas.profile.eq{background-color:rgba(8,11,15,.3);filter:none}
 .upd-row{display:flex;gap:8px;flex-wrap:wrap}.upd-row .btn{flex:1 1 200px}
 
 /* ===== Progression ===== */
+.histmore{align-self:center;min-width:220px}
 .pgcard{gap:var(--space-3)}
 .seg{display:inline-flex;gap:4px;padding:3px;border-radius:var(--radius-pill);background:var(--card2);border:1px solid var(--edge);flex-wrap:wrap}
 .seg button{all:unset;cursor:pointer;min-height:36px;padding:0 14px;display:inline-flex;align-items:center;border-radius:var(--radius-pill);font:700 13px/1 var(--font-display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
@@ -616,6 +617,7 @@ canvas.profile.eq{background-color:rgba(8,11,15,.3);filter:none}
       <div class="totals" id="totals"></div>
       <div class="toolbar"><h2>Dernières séances</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small" id="btnCopyHist">Copier en JSON</button><button class="btn small ghost" id="btnClearEx" hidden>Retirer les exemples</button></div></div>
       <div class="hlist" id="histList"></div>
+      <button type="button" class="btn histmore" id="histMore" hidden>Voir plus</button>
     </div>
   </section>
 
@@ -1745,7 +1747,7 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '26/11/2026 16:59';
+const APP_VERSION = '26/11/2026 17:29';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 const progIncMax = p => Math.max(0, ...p.segments.map(s => s.i));
@@ -1835,9 +1837,10 @@ function sparkSVG(samples, W, H){
   const max = Math.max(...samples.map(s => s[1]), 1), n = samples.length - 1;
   return `<polyline fill="none" stroke="var(--data-line)" stroke-width="2" vector-effect="non-scaling-stroke" points="${samples.map((s, k) => (k / n * W).toFixed(1) + ',' + (H - 2 - s[1] / max * (H - 4)).toFixed(1)).join(' ')}"/>`;
 }
-function renderHistory(){
+let histShown = 5;
+function renderHistory(still){
   const h = store.get('sessions', []);
-  renderProgress(true);
+  renderProgress(!still);
   const wk = Date.now() - 7 * 864e5, w = h.filter(s => s.start >= wk);
   const sum = (a, f) => a.reduce((x, s) => x + (s[f] || 0), 0);
   $('#totals').innerHTML = [
@@ -1845,7 +1848,11 @@ function renderHistory(){
     ['Temps (7 j)', hms(sum(w, 'duration')), ''], ['Calories brutes (7 j)', Math.round(sum(w, 'kcal')), 'kcal'], ['Calories nettes (7 j)', Math.round(w.reduce((x, s) => x + sessNet(s), 0)), 'kcal']
   ].map(([l, v, u]) => `<div class="total"><span class="label">${l}</span><div class="v num">${v}${u ? `<small style="font:700 13px var(--font-body);color:var(--muted);margin-left:var(--space-1)">${u}</small>` : ''}</div></div>`).join('');
   $('#btnClearEx').hidden = !h.some(s => s.example);
-  $('#histList').innerHTML = h.length ? h.map(s => {
+  // 5 dernières séances, puis 10 de plus à chaque « Voir plus »
+  const shown = h.slice(0, histShown), rest = h.length - shown.length;
+  $('#histMore').hidden = rest <= 0;
+  $('#histMore').textContent = 'Voir plus (' + rest + ' autre' + (rest > 1 ? 's' : '') + ')';
+  $('#histList').innerHTML = h.length ? shown.map(s => {
     const d = new Date(s.start);
     return `<div class="hrow" data-id="${s.id}">
       <button type="button" class="when" data-a="open"><b>${(s.program || 'Séance libre').replace(/</g, '&lt;')}${s.example ? '<span class="tag">Exemple</span>' : ''}</b><span>${d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })} · ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · <u>Voir le bilan</u></span></button>
@@ -2451,6 +2458,7 @@ $('#editor').addEventListener('click', e => {
   if (tr && b.dataset.a === 'del' && editing.segments.length > 1){ editing.segments.splice(+tr.dataset.k, 1); renderEditor(); }
   if (tr && b.dataset.a === 'dup'){ editing.segments.splice(+tr.dataset.k + 1, 0, { ...editing.segments[+tr.dataset.k] }); renderEditor(); }
 });
+$('#histMore').addEventListener('click', () => { histShown += 10; renderHistory(true); });
 $('#histList').addEventListener('click', e => {
   const o = e.target.closest('[data-a="open"]');
   if (o){ const s = store.get('sessions', []).find(x => x.id === +o.closest('.hrow').dataset.id); if (s) showSummary(s, false); return; }
