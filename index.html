@@ -450,40 +450,19 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(3px)}
 body,.big{background:
   radial-gradient(120vw 70vh at 10% -10%,color-mix(in srgb,var(--effort) 17%,transparent),transparent 65%),
   radial-gradient(110vw 60vh at 100% 105%,rgba(255,170,31,.12),transparent 65%),
-  repeating-linear-gradient(115deg,rgba(255,255,255,.035) 0 1px,transparent 1px 22px),
   linear-gradient(180deg,#1b2330 0%,#121820 55%,#0d1117 100%);
   background-attachment:fixed}
 .console,.ctl,.card,.hlist,.editor{background:linear-gradient(180deg,rgba(30,36,45,.9),rgba(19,23,29,.92))}
 .conn{background:rgba(22,27,34,.88)}
 .ds-tabbar::after{background:#1a2029}
 
-/* ===== Ciel : petites étoiles qui scintillent + étoiles filantes (créées par skyLoop) ===== */
-.starsky{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
-.big .starsky{position:absolute}
+/* ===== Fond : piste rétro (canvas #bgfx, dessiné par bgLoop) ===== */
+.bgfx{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
 .wrap{position:relative;z-index:1}
-.big > :not(.starsky){position:relative;z-index:1}
-.starsky::before{content:"";position:absolute;inset:-20%;opacity:.8;animation:twinkle 6s ease-in-out infinite alternate;
-  background-image:
-    radial-gradient(1.4px 1.4px at 22px 34px,rgba(255,255,255,.75),transparent 70%),
-    radial-gradient(1px 1px at 128px 84px,rgba(255,255,255,.55),transparent 70%),
-    radial-gradient(1.8px 1.8px at 64px 152px,rgba(196,255,58,.7),transparent 70%),
-    radial-gradient(1px 1px at 168px 176px,rgba(255,255,255,.5),transparent 70%),
-    radial-gradient(1.5px 1.5px at 96px 112px,rgba(255,170,31,.6),transparent 70%),
-    radial-gradient(1px 1px at 190px 20px,rgba(255,255,255,.45),transparent 70%);
-  background-size:210px 210px}
-.starsky::after{content:"";position:absolute;inset:-20%;opacity:.5;animation:twinkle 9s ease-in-out infinite alternate-reverse;
-  background-image:radial-gradient(1.2px 1.2px at 40px 70px,rgba(255,255,255,.7),transparent 70%),radial-gradient(1px 1px at 150px 140px,rgba(255,255,255,.5),transparent 70%);
-  background-size:170px 170px;background-position:60px 30px}
-@keyframes twinkle{from{opacity:.85}to{opacity:.3;transform:translateY(-10px)}}
-.star{position:absolute;width:var(--len,120px);height:3px;border-radius:3px;transform-origin:0 50%;opacity:0;
-  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--effort) 75%,transparent) 65%,#fff);
-  filter:drop-shadow(0 0 6px var(--effort));animation:shoot 1.5s cubic-bezier(.35,.1,.6,1) forwards}
-.star::after{content:"";position:absolute;right:-2px;top:50%;width:5px;height:5px;margin-top:-2.5px;border-radius:50%;background:#fff;box-shadow:0 0 10px 2px var(--effort)}
-@keyframes shoot{0%{opacity:0;transform:rotate(155deg) translateX(0)}10%{opacity:1}75%{opacity:.9}100%{opacity:0;transform:rotate(155deg) translateX(80vmax)}}
-/* Panneaux un peu plus transparents pour que le ciel se devine derrière */
+.big > :not(.bgfx){position:relative;z-index:1}
+/* Panneaux un peu plus transparents pour que la piste se devine derrière */
 .console,.ctl,.card,.hlist,.editor{background:linear-gradient(180deg,rgba(30,36,45,.7),rgba(19,23,29,.76))}
 .big-prog,.big-ctl,.big-metrics div{background:rgba(17,21,27,.7)}
-@media (prefers-reduced-motion:reduce){.starsky::before,.starsky::after{animation:none!important}.star{display:none}}
 
 /* ===== Tuiles translucides : le ciel se voit à travers ; barre d'onglets et champs restent opaques ===== */
 :root{--card:rgba(40,47,58,.5);--card2:rgba(8,11,15,.38);--panel2:rgba(34,40,50,.5)}
@@ -514,7 +493,7 @@ canvas.profile.eq{background-color:rgba(8,11,15,.3);filter:none}
 </style>
 
 </head><body>
-<div class="starsky" id="sky" aria-hidden="true"></div>
+<canvas class="bgfx" id="bgfx" aria-hidden="true"></canvas>
 <div class="wrap">
   <header class="top">
     <div class="brand"><h1>Foulée</h1><small id="today">Aujourd'hui</small></div>
@@ -698,7 +677,6 @@ canvas.profile.eq{background-color:rgba(8,11,15,.3);filter:none}
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <div class="big" id="bigRun" hidden role="dialog" aria-modal="true" aria-label="Séance en cours, grand écran">
-  <div class="starsky" aria-hidden="true"></div>
   <div class="big-top">
     <span class="state" id="bState"><i></i><span>En marche</span></span>
     <span class="big-time num" id="bTime" aria-label="Temps écoulé">00:00</span>
@@ -1748,7 +1726,7 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '26/11/2026 14:08';
+const APP_VERSION = '26/11/2026 14:25';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 
@@ -2027,27 +2005,8 @@ function renderEffort(){
   });
 }
 
-/* ---------- Ciel : étoiles filantes, plus fréquentes, rapides et longues quand l'effort monte ---------- */
+// Téléphone réglé pour réduire les animations : égaliseurs et fond restent figés
 const skyCalm = matchMedia('(prefers-reduced-motion: reduce)');
-function shootStar(i){
-  if (document.hidden || skyCalm.matches) return;
-  const host = big.open ? $('#bigRun .starsky') : $('#sky');
-  if (!host || host.childElementCount > 6) return;
-  const st = document.createElement('i');
-  st.className = 'star';
-  st.style.left = (25 + Math.random() * 85).toFixed(1) + 'vw';
-  st.style.top = (-8 + Math.random() * 60).toFixed(1) + 'vh';
-  st.style.setProperty('--len', Math.round(80 + Math.random() * 80 + i * 110) + 'px');
-  st.style.animationDuration = (1.7 - i * 0.9 + Math.random() * 0.4).toFixed(2) + 's';
-  st.addEventListener('animationend', () => st.remove());
-  host.appendChild(st);
-}
-(function skyLoop(){
-  const run = S.status === 'running', i = run ? effortNow() : 0;
-  shootStar(i);
-  // Au repos : une toutes les 5 à 9 s ; en séance : de toutes les 2,6 s (calme) à toutes les 0,6 s (intense)
-  setTimeout(skyLoop, run ? 2600 - i * 2000 + Math.random() * 700 : 5000 + Math.random() * 4000);
-})();
 
 /* ---------- Égaliseur du parcours : colonnes de carreaux, la colonne en cours danse avec l'effort ---------- */
 // Couleur d'ensemble = intensité actuelle rapportée à tout le parcours (vert → jaune → orange → rouge).
@@ -2142,6 +2101,43 @@ function eqGrow(cv, segs, plan){
   const dt = Math.min(200, now - eq.last); eq.last = now;
   const i = effortNow();
   ['#pbProfile', '#bpProfile'].forEach(sel => { const cv = $(sel); if (cv && cv.offsetParent !== null) drawEq(cv, now, i, dt); });
+})(0);
+
+/* ---------- Fond : piste rétro ---------- */
+// Sol en perspective qui défile vers soi à la vitesse du tapis, égaliseur sur la ligne d'horizon ; couleur et énergie suivent l'effort.
+// Dessiné dans la page, ou dans le grand écran quand il est ouvert (le canvas y est déplacé).
+const bgs = { last: 0, cols: [], ph: 0 };
+function bgSynth(g, w, h, C, en, now, dt){
+  const hz = Math.round(h * 0.42), cell = 8, step = 11, N = Math.ceil(w / step), R = Math.floor(h * 0.16 / step);
+  for (let c = 0; c < N; c++){
+    const st = bgs.cols[c] || (bgs.cols[c] = { v: 0, to: 0, next: 0 });
+    if (now > st.next){ const mid = 1 - Math.abs(c / N - 0.5) * 1.2; st.to = en * mid * (0.3 + 0.7 * Math.random()); st.next = now + 1000 / (2 + 8 * en) * (0.6 + 0.8 * Math.random()); }
+    st.v += (st.to - st.v) * Math.min(1, dt / 120);
+    const lit = Math.round(st.v * R);
+    for (let r = 0; r < lit; r++){ g.fillStyle = `rgba(${C},${(0.25 + 0.4 * r / R).toFixed(3)})`; g.fillRect(c * step, hz - (r + 1) * step, cell, cell); }
+  }
+  g.fillStyle = `rgba(${C},.6)`; g.fillRect(0, hz, w, 2);
+  bgs.ph = (bgs.ph + dt / 1000 * (0.15 + Math.max(S.status === 'running' ? S.speed : 0, 0) * 0.12)) % 1;
+  const L = 12;
+  for (let k = 0; k < L; k++){
+    const d = (k + bgs.ph) / L, y = hz + (h - hz) * Math.pow(d, 2.2);
+    g.fillStyle = `rgba(${C},${(0.08 + 0.35 * d).toFixed(3)})`; g.fillRect(0, y, w, 1 + d * 2);
+  }
+  g.strokeStyle = `rgba(${C},.22)`; g.lineWidth = 1;
+  for (let j = -10; j <= 10; j++){ g.beginPath(); g.moveTo(w / 2, hz); g.lineTo(w / 2 + j * w * 0.16, h); g.stroke(); }
+}
+(function bgLoop(now){
+  requestAnimationFrame(bgLoop);
+  if (document.hidden || now - bgs.last < 40) return;
+  const dt = Math.min(200, now - bgs.last); bgs.last = now;
+  const cv = $('#bgfx'), host = big.open ? $('#bigRun') : document.body;
+  if (cv.parentNode !== host) host.prepend(cv);
+  const dpr = Math.min(2, window.devicePixelRatio || 1), w = innerWidth, h = innerHeight;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)){ cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const run = S.status === 'running', i = run ? effortNow() : 0, en = skyCalm.matches ? 0 : run ? 0.3 + 0.7 * i : 0.15;
+  const C = rgbOf(effortColor(i)).join(',');
+  bgSynth(g, w, h, C, en, now, dt);
 })(0);
 
 /* ---------- Horloge (1 s) ---------- */
