@@ -727,7 +727,7 @@ html{scroll-padding-bottom:128px}
       <div style="display:flex;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3)"><button type="button" class="btn" id="sumShareLog">Partager le journal</button><button type="button" class="btn" id="sumCopyLog">Copier</button></div>
       <pre class="log" id="sumLog" style="height:220px"></pre>
     </details>
-    <button type="button" class="btn" id="sumSend">Envoyer à Route des Vins</button>
+    <button type="button" class="btn" id="sumSend">Envoyer à Olipingo</button>
     <div class="sendbox" id="sumSendBox" hidden><span class="hint" id="sumSendMsg"></span><textarea id="sumCode" readonly aria-label="Code de la séance"></textarea></div>
     <button type="button" class="btn primary" id="sumClose">Fermer le bilan</button>
   </div>
@@ -1375,7 +1375,9 @@ function finishSession(){
 /* ---------- Pont avec Route des Vins ----------
    Codes : « FP1 » = programme (Hugo → Foulée, dans le lien #prog=…), « FS1 » = séance (Foulée → Route des Vins, copié puis collé : claude.ai ne le laisse pas passer dans le lien).
    Suite : z = JSON compressé (deflate-raw), j = JSON brut ; puis « . » et le contenu en base64url. */
-const RDV_URL = 'https://claude.ai/artifact/5W78k4ydrqez9dnNmCWDY6';
+const RDV_URL = 'https://claude.ai/artifact/U6CkAKW5Lu89RqSjpzH8oi'; // l'artefact Olipingo (ex-Route des Vins)
+// Sur Android, l'appli Olipingo s'ouvre directement ; sans l'appli, Chrome retombe sur l'artefact.
+const RDV_APP = (hash) => 'intent://open' + (hash ? '#' + hash : '') + '#Intent;scheme=olipingo;package=fr.olipingo.app;S.browser_fallback_url=' + encodeURIComponent(RDV_URL + (hash ? '#' + hash : '')) + ';end';
 const b64u = bytes => { let t = ''; for (let k = 0; k < bytes.length; k += 0x8000) t += String.fromCharCode.apply(null, bytes.subarray(k, k + 0x8000)); return btoa(t).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
 const unb64u = str => { const t = atob(str.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((str.length + 3) % 4)); const b = new Uint8Array(t.length); for (let k = 0; k < t.length; k++) b[k] = t.charCodeAt(k); return b; };
 async function packCode(kind, obj){
@@ -1422,7 +1424,7 @@ async function readHashProgram(){
     renderHugo();
   } catch(e){
     log('err', 'Programme reçu illisible : ' + e.message);
-    notice('<div><b>Le programme de Hugo n\'a pas pu être chargé.</b> ' + e.message + '. Redemande-le dans Route des Vins.</div>', true);
+    notice('<div><b>Le programme de Hugo n\'a pas pu être chargé.</b> ' + e.message + '. Redemande-le dans Olipingo.</div>', true);
   }
 }
 function renderHugo(){
@@ -1464,13 +1466,14 @@ async function sendToRdv(){
   $('#sumCode').value = code; $('#sumSendBox').hidden = false;
   let copied = false;
   try { await navigator.clipboard.writeText(code); copied = true; } catch(e){}
-  log('', 'Séance envoyée à Route des Vins : code de ' + code.length + ' caractères' + (copied ? ', copié' : ', copie refusée'));
+  log('', 'Séance envoyée à Olipingo : code de ' + code.length + ' caractères' + (copied ? ', copié' : ', copie refusée'));
   // claude.ai ne transmet pas la séance dans le lien (vérifié) : seul « #seance-foulee » est tenté, pour que Route des Vins ouvre son encadré de collage.
   const url = RDV_URL + '#seance-foulee';
-  $('#sumSendMsg').textContent = copied ? 'Code copié. Dans Route des Vins, encadré « Ta séance Foulée » en haut de l\'accueil : appui long, puis Coller.' : 'Copie automatique refusée : sélectionne le code ci-dessous et copie-le, puis colle-le dans l\'encadré « Ta séance Foulée » de Route des Vins.';
+  $('#sumSendMsg').textContent = copied ? 'Code copié. Dans Olipingo, encadré « Ta séance Foulée » en haut de l\'accueil : appui long, puis Coller.' : 'Copie automatique refusée : sélectionne le code ci-dessous et copie-le, puis colle-le dans l\'encadré « Ta séance Foulée » d\'Olipingo.';
+  if (copied && /Android/i.test(navigator.userAgent)){ log('', 'Ouverture de l\'appli Olipingo'); location.href = RDV_APP('seance-foulee'); return; }
   let w = null; try { w = window.open(url, '_blank'); } catch(e){}
-  log(w ? '' : 'err', 'Ouverture de Route des Vins : ' + (w ? 'demandée' : 'bloquée par le navigateur'));
-  if (!w){ $('#sumSendMsg').textContent = 'Le navigateur a bloqué l\'ouverture. ' + (copied ? 'Le code est copié : reviens sur Route des Vins et colle-le dans l\'encadré « Ta séance Foulée ».' : 'Copie le code ci-dessous et colle-le dans l\'encadré « Ta séance Foulée » de Route des Vins.'); }
+  log(w ? '' : 'err', 'Ouverture d\'Olipingo : ' + (w ? 'demandée' : 'bloquée par le navigateur'));
+  if (!w){ $('#sumSendMsg').textContent = 'Le navigateur a bloqué l\'ouverture. ' + (copied ? 'Le code est copié : reviens sur Olipingo et colle-le dans l\'encadré « Ta séance Foulée ».' : 'Copie le code ci-dessous et colle-le dans l\'encadré « Ta séance Foulée » d\'Olipingo.'); }
   if (!copied){ $('#sumCode').focus(); $('#sumCode').select(); }
 }
 
@@ -1802,7 +1805,7 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '26/11/2026 17:46';
+const APP_VERSION = '26/11/2026 21:00';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 const progIncMax = p => Math.max(0, ...p.segments.map(s => s.i));
