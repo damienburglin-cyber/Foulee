@@ -1662,7 +1662,6 @@ function progEffective(pr){
   });
   return out;
 }
-function progProfile(W, H){ const e = progEffective(prog); return e ? profileSVG(e, W, H, prog.t, prog.p.segments) : profileSVG(prog.p.segments, W, H, prog.t); }
 function adoptFromBelt(){
   const sp = Math.round(S.speed * 10) / 10, inc = Math.round(S.incline / incStep()) * incStep();
   if (sp === S.targetSpeed && inc === S.targetIncline) return;
@@ -1749,34 +1748,10 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '26/11/2026 13:13';
+const APP_VERSION = '26/11/2026 14:08';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 
-function profileSVG(segs, W, H, at, plan){
-  // Vitesse en aire data-line en haut ; l'inclinaison a sa propre bande de 12 px en bas (pas de double échelle)
-  // plan : programme prévu, tracé en pointillés quand segs est le profil modifié à la main
-  const all = plan ? segs.concat(plan) : segs;
-  const tot = segs.reduce((a, s) => a + s.d, 0) || 1, maxS = Math.max(4, ...all.map(s => s.s)), maxI = Math.max(6, ...all.map(s => s.i)), HS = H - 16;
-  let x = 0, sp = `M0 ${HS}`, top = '', inc = '';
-  segs.forEach((s, k) => { const x2 = x + s.d / tot * W, y = HS - 2 - s.s / maxS * (HS - 6), hi = s.i / maxI * 12;
-    sp += ` L${x} ${y} L${x2} ${y}`; top += (k ? ' L' : 'M') + `${x} ${y} L${x2} ${y}`;
-    if (hi > 0) inc += `<rect x="${x}" y="${H - hi}" width="${Math.max(0, x2 - x - 2)}" height="${hi}" fill="var(--gold)"/>`;
-    x = x2; });
-  sp += ` L${W} ${HS} Z`;
-  let cur = '';
-  if (at != null){ const cx = Math.min(1, at / tot) * W; cur = `<rect x="0" y="0" width="${cx}" height="${H}" fill="var(--effort, var(--ink))" opacity=".1"/><line class="pcur" x1="${cx}" x2="${cx}" y1="0" y2="${H}" stroke="var(--effort, var(--ink))" stroke-width="3" vector-effect="non-scaling-stroke"/>`; }
-  let ghost = '';
-  if (plan){ let gx = 0, gp = ''; plan.forEach((s, k) => { const x2 = gx + s.d / tot * W, y = HS - 2 - s.s / maxS * (HS - 6); gp += (k ? ' L' : 'M') + `${gx} ${y} L${x2} ${y}`; gx = x2; });
-    ghost = `<path d="${gp}" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>`; }
-  // Chaleur : une bande par étape, à la couleur de son effort relatif dans le programme
-  const ef = segs.map(q => vo2(q.s, q.i)), lo = Math.min(...ef), hi = Math.max(...ef);
-  let heat = '', hx = 0;
-  segs.forEach((q, k) => { const x2 = hx + q.d / tot * W, yy = HS - 2 - q.s / maxS * (HS - 6), c = effortColor(hi - lo > 0.5 ? (ef[k] - lo) / (hi - lo) : effortAbs(q.s, q.i));
-    heat += `<rect x="${hx}" y="${yy}" width="${Math.max(0, x2 - hx)}" height="${HS - yy}" fill="${c}" opacity=".3"/><line x1="${hx}" x2="${x2}" y1="${yy}" y2="${yy}" stroke="${c}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
-    hx = x2; });
-  return `${heat}${ghost}${inc}${cur}`;
-}
 function launchProgram(id, runPid){
   const p = programs.find(x => x.id === id); if (!p) return;
   if (!driver){ notice('<div><b>Aucun tapis connecté.</b> Connecte le tapis ou lance le mode démo avant de lancer un programme.</div>'); return; }
@@ -1806,7 +1781,7 @@ function renderEditor(){
   if (!editing){ ed.hidden = true; ed.innerHTML = ''; return; }
   ed.hidden = false; ed.className = 'editor';
   ed.innerHTML = `<label class="field"><span class="label">Nom du programme</span><input type="text" id="edName" value="${editing.name.replace(/"/g, '&quot;')}"></label>
-    <svg class="profile" id="edProfile" viewBox="0 0 600 64" preserveAspectRatio="none">${profileSVG(editing.segments, 600, 64)}</svg>
+    <canvas class="profile eq" id="edProfile" role="img" aria-label="Égaliseur du programme en cours de modification ; traits blancs : version enregistrée"></canvas>
     <ol class="steps">
     ${editing.segments.map((s, k) => `<li class="step" data-k="${k}">
       <div class="step-head"><span class="step-n">Étape ${k + 1}</span><span class="step-act"><button class="iconbtn" data-a="dup" title="Dupliquer l'étape" aria-label="Dupliquer l'étape ${k + 1}">${ICON.copy}</button><button class="iconbtn" data-a="del" title="Supprimer l'étape" aria-label="Supprimer l'étape ${k + 1}">${ICON.x}</button></span></div>
@@ -1820,7 +1795,7 @@ function renderEditor(){
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="num" id="edSum" style="color:var(--muted);font-size:14px"></span><button class="btn ghost" id="edCancel">Annuler</button><button class="btn primary" id="edSave">Enregistrer</button></div></div>`;
   edSum();
 }
-function edSum(){ const el = $('#edSum'); if (el) el.textContent = hms(progDur(editing)) + ' · ≈ ' + fr2(progDist(editing)) + ' km'; const pf = $('#edProfile'); if (pf) pf.innerHTML = profileSVG(editing.segments, 600, 64); }
+function edSum(){ const el = $('#edSum'); if (el) el.textContent = hms(progDur(editing)) + ' · ≈ ' + fr2(progDist(editing)) + ' km'; const pf = $('#edProfile'); if (pf && editing.segments.length){ const orig = !editing.isNew && programs.find(x => x.id === editing.id), plan = orig ? orig.segments : null; if (!drawEqStatic(pf, editing.segments, plan, 1)) eqGrow(pf, editing.segments, plan); } }
 
 // Programmes de Hugo : gardés dans la liste une fois terminés 2 fois (HUGO_KEEP) ; avant, en attente (8 au plus)
 const HUGO_KEEP = 2;
@@ -1838,10 +1813,11 @@ function renderPrograms(){
   const wait = programs.filter(p => !progShown(p)).length;
   $('#progList').innerHTML = programs.filter(progShown).map(p => `<article class="pcard" data-id="${p.id}">
     <h3>${p.name.replace(/</g, '&lt;')}${p.par ? '<span class="by">' + String(p.par).replace(/</g, '&lt;') + '</span>' : ''}</h3>
-    <svg class="profile" viewBox="0 0 600 64" preserveAspectRatio="none">${profileSVG(p.segments, 600, 64)}</svg>
+    <canvas class="profile eq" data-eq="${p.id}" role="img" aria-label="Égaliseur du programme : hauteur = effort de chaque moment"></canvas>
     <div class="facts num"><span><b>${hms(progDur(p))}</b> durée</span><span><b>${fr2(progDist(p))}</b> km</span><span><b>${fr1(Math.max(...p.segments.map(s => s.s)))}</b> km/h max</span><span><b>${p.segments.length}</b> étapes</span></div>
     <div class="actions"><button class="btn primary small" data-a="run">Lancer</button><button class="btn small" data-a="edit">Modifier</button><button class="btn small" data-a="copy">Dupliquer</button><button class="btn small ghost" data-a="del">Supprimer</button></div>
   </article>`).join('') + (wait ? `<p class="ds-note">${wait} programme${wait > 1 ? 's' : ''} de Hugo en attente : ${wait > 1 ? 'ils rejoignent' : 'il rejoint'} la liste après ${HUGO_KEEP} séances terminées.</p>` : '') || '<div class="empty">Aucun programme. Crée le premier avec « Nouveau programme ».</div>';
+  $$('#progList canvas[data-eq]').forEach(cv => { const p = programs.find(x => String(x.id) === cv.dataset.eq); if (p) eqGrow(cv, p.segments, null); });
 }
 
 /* ---------- Historique ---------- */
