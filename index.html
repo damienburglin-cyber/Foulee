@@ -1426,7 +1426,9 @@ const ADDED = [
     {d:120,s:3,i:0},{d:90,s:3,i:1},{d:90,s:3,i:2},{d:90,s:3,i:3},{d:90,s:3,i:4},
     {d:90,s:3.5,i:2},{d:90,s:3.5,i:0},{d:90,s:3,i:4},{d:150,s:3,i:0}] },
   { id: 'p8', name: 'Vallons 70 min', segments: [
-    {d:300,s:4,i:0},{d:240,s:4.5,i:0},{d:240,s:5,i:1},{d:240,s:4.5,i:3},{d:240,s:4.5,i:5},{d:180,s:5.5,i:1},{d:180,s:6,i:0},{d:240,s:5,i:2},{d:240,s:4.5,i:4},{d:180,s:5,i:3},{d:180,s:6,i:2},{d:240,s:5.5,i:0},{d:240,s:4,i:5},{d:180,s:5,i:2},{d:180,s:6,i:1},{d:240,s:4.5,i:4},{d:180,s:5.5,i:2},{d:180,s:6,i:0},{d:180,s:4.5,i:0},{d:120,s:4,i:0}] }
+    {d:300,s:4,i:0},{d:240,s:4.5,i:0},{d:240,s:5,i:1},{d:240,s:4.5,i:3},{d:240,s:4.5,i:5},{d:180,s:5.5,i:1},{d:180,s:6,i:0},{d:240,s:5,i:2},{d:240,s:4.5,i:4},{d:180,s:5,i:3},{d:180,s:6,i:2},{d:240,s:5.5,i:0},{d:240,s:4,i:5},{d:180,s:5,i:2},{d:180,s:6,i:1},{d:240,s:4.5,i:4},{d:180,s:5.5,i:2},{d:180,s:6,i:0},{d:180,s:4.5,i:0},{d:120,s:4,i:0}] },
+  { id: 'p9', name: 'Balade 70 min', segments: [
+    {d:300,s:4,i:0},{d:300,s:4.5,i:0},{d:480,s:5,i:1},{d:420,s:4.5,i:2},{d:480,s:5,i:0},{d:420,s:5.5,i:1},{d:480,s:4.5,i:3},{d:420,s:5,i:1},{d:360,s:5.5,i:0},{d:300,s:4.5,i:0},{d:240,s:4,i:0}] }
 ];
 // Programmes ajoutés puis revus : remplacés seulement s'ils n'ont pas été modifiés à la main
 const REVISED = [
@@ -1480,7 +1482,7 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '23/11/2026 21:00';
+const APP_VERSION = '26/11/2026 08:00';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 
