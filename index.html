@@ -1085,7 +1085,6 @@ async function connectDevice(device, att){
     att.drv = drv; driver = drv; S.mode = mode;
     S.info['Protocole'] = drv.name;
     await withTimeout(drv.init(), 10000, 'Initialisation du tapis'); check();
-    joinAt = Date.now();
     $('#devName').textContent = device.name || 'Tapis';
     log('', 'Prêt, protocole ' + drv.name);
     render();
@@ -1175,12 +1174,9 @@ function setStatus(st){
   log('', 'Statut appli : ' + (LABEL[prev] || prev) + ' → ' + (LABEL[st] || st) + ' · consigne ' + fr1(S.targetSpeed) + ' km/h, ' + S.targetIncline + ' %' + (prog ? ' · programme « ' + prog.p.name + ' », étape ' + (prog.seg + 1) : ''));
   if (st !== 'error') S.errorMsg = '';
   if (st === 'starting' && !boot) startBoot();
-  // Tapis déjà en marche à la connexion : on suit sa vitesse et sa pente sans rien lui envoyer
-  const join = st === 'running' && (prev === 'idle' || prev === 'off') && joinAt && Date.now() - joinAt < 5000 && S.mode !== 'demo';
-  if (st === 'running' || st === 'starting') joinAt = 0;
   if (st === 'running' && prev !== 'paused'){
     if (!session || prev === 'idle' || prev === 'off'){ if (prev !== 'starting' || !session) beginSession(); }
-    if (join) joinBelt(); else if (!boot) startBoot();
+    if (!boot) startBoot();
   }
   if (st === 'running' && prev === 'paused' && driver && !boot) startBoot();
   if (st !== 'running' && st !== 'starting') boot = null;
@@ -1403,14 +1399,7 @@ const sync = { pending: false, t: 0, tries: 0, lastS: null, lastI: null };
 // Mise en route : le tapis fait son compte à rebours, démarre à sa vitesse mini et ignore les consignes un moment.
 // On attend qu'il roule, on laisse 2 s, puis on envoie la vitesse toutes les 2 s jusqu'à ce qu'il l'affiche (30 s max).
 // Ce temps-là ne compte pas dans le programme.
-let boot = null, joinAt = 0;
-function joinBelt(){
-  boot = null;
-  if (S.speed > 0){ S.targetSpeed = Math.round(S.speed * 10) / 10; S.targetIncline = Math.round(S.incline / incStep()) * incStep(); }
-  sync.pending = false; sync.tries = 0; sync.lastS = S.speed; sync.lastI = S.incline;
-  log('', 'Tapis déjà en marche à la connexion (' + fr1(S.speed) + ' km/h, ' + S.incline + ' %) : Foulée suit sans rien changer');
-  toast('Tapis déjà en marche : vitesse et pente gardées');
-}
+let boot = null;
 function startBoot(){
   if (!driver) return;
   if (S.mode === 'demo'){ sync.tries = 0; sendTarget(); return; }
@@ -1597,7 +1586,7 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '26/11/2026 09:12';
+const APP_VERSION = '26/11/2026 09:20';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 
