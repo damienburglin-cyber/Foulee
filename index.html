@@ -415,6 +415,31 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(3px)}
 .sheet-in{border:1px solid var(--edge);border-bottom:none;background:linear-gradient(180deg,#191d24,var(--panel))}
 .kbd kbd{background:var(--card);border-color:var(--edge)}
 @media (prefers-reduced-motion:reduce){.console.live::after,.state.running i{animation:none!important}}
+
+/* ===== Courbes vivantes : couleur, lueur et rythme suivent l'intensité de l'effort (--i, posé par renderEffort) ===== */
+:root{--effort:#c4ff3a;--i:0;--flow-dur:3s;--pulse-dur:1.6s;--belt-dur:.6s}
+#liveChart{--c:var(--effort)} #incChart{--c:var(--gold)}
+.ds-chart h4 .h4r{display:inline-flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:4px 8px}
+.ds-chart h4 .h4r small{white-space:nowrap}
+.chart .ln{stroke:var(--c);transition:stroke .8s}
+.chart .head{stroke:var(--c)}
+.chart .ring{stroke:var(--c);stroke-width:9px;opacity:0}
+.chart .flow{stroke:#fff;opacity:0}
+.ds-chart.live .chart{filter:drop-shadow(0 0 calc(2px + var(--i) * 8px) var(--c))}
+.ds-chart.live .flow{opacity:.9;animation:flow var(--flow-dur) linear infinite}
+.ds-chart.live .ring{animation:ring var(--pulse-dur) ease-out infinite}
+@keyframes flow{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+@keyframes ring{0%{stroke-width:9px;opacity:.75}100%{stroke-width:34px;opacity:0}}
+.zone{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:var(--radius-pill);font:700 12px/1.5 var(--font-display);text-transform:uppercase;letter-spacing:.1em;color:var(--effort);border:1px solid var(--effort);background:color-mix(in srgb,var(--effort) 14%,transparent);transition:color .8s,border-color .8s,background .8s}
+.zone::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor;animation:pulse var(--pulse-dur) ease-in-out infinite}
+.zone.flash{animation:zoneup .7s var(--ease-bounce)}
+@keyframes zoneup{0%{transform:scale(1)}35%{transform:scale(1.25);box-shadow:0 0 18px var(--effort)}100%{transform:scale(1)}}
+/* Vitesse et curseur de programme prennent la lueur de l'effort ; le tapis défile à la vitesse réelle */
+.hero .speed{text-shadow:0 0 calc(14px + var(--i) * 22px) color-mix(in srgb,var(--effort) 55%,transparent);transition:text-shadow .8s}
+#bSpeed{text-shadow:0 0 calc(14px + var(--i) * 26px) color-mix(in srgb,var(--effort) 55%,transparent)}
+.profile .pcur{filter:drop-shadow(0 0 4px var(--effort))}
+.console.live:has(.state.running)::after{animation-duration:var(--belt-dur)}
+@media (prefers-reduced-motion:reduce){.ds-chart.live .flow{opacity:0}}
 </style>
 
 <div class="wrap">
@@ -474,7 +499,7 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(3px)}
         <div class="metric" id="mHr" hidden><span class="label">Cardio</span><span class="v num" id="vHr">–<small>bpm</small></span></div>
       </div>
       <div class="ds-chart">
-        <h4>Vitesse <small>km/h · pointillés : consigne</small></h4>
+        <h4>Vitesse <span class="h4r"><small>km/h · pointillés : consigne</small><span class="zone" id="effortZone" hidden></span></span></h4>
         <svg class="chart" id="liveChart" viewBox="0 0 600 84" preserveAspectRatio="none" role="img" aria-label="Courbe de vitesse de la séance"></svg>
         <h4>Inclinaison <small>%</small></h4>
         <svg class="chart" id="incChart" viewBox="0 0 600 56" preserveAspectRatio="none" role="img" aria-label="Courbe d'inclinaison de la séance"></svg>
@@ -1586,7 +1611,7 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '26/11/2026 09:20';
+const APP_VERSION = '26/11/2026 09:21';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 
@@ -1602,7 +1627,7 @@ function profileSVG(segs, W, H, at, plan){
     x = x2; });
   sp += ` L${W} ${HS} Z`;
   let cur = '';
-  if (at != null){ const cx = Math.min(1, at / tot) * W; cur = `<rect x="0" y="0" width="${cx}" height="${H}" fill="var(--ink)" opacity=".06"/><line x1="${cx}" x2="${cx}" y1="0" y2="${H}" stroke="var(--ink)" stroke-width="2" vector-effect="non-scaling-stroke"/>`; }
+  if (at != null){ const cx = Math.min(1, at / tot) * W; cur = `<rect x="0" y="0" width="${cx}" height="${H}" fill="var(--effort, var(--ink))" opacity=".1"/><line class="pcur" x1="${cx}" x2="${cx}" y1="0" y2="${H}" stroke="var(--effort, var(--ink))" stroke-width="3" vector-effect="non-scaling-stroke"/>`; }
   let ghost = '';
   if (plan){ let gx = 0, gp = ''; plan.forEach((s, k) => { const x2 = gx + s.d / tot * W, y = HS - 2 - s.s / maxS * (HS - 6); gp += (k ? ' L' : 'M') + `${gx} ${y} L${x2} ${y}`; gx = x2; });
     ghost = `<path d="${gp}" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>`; }
@@ -1810,12 +1835,27 @@ function render(){
   // Courbes en direct : vitesse et inclinaison sur deux graphiques, chacun sa propre échelle
   const sm = session ? session.samples : [], n = Math.max(sm.length - 1, 60);
   const curve = (sel, H, idx, max, ref) => {
-    const y = v => (H - 4 - v / max * (H - 10)).toFixed(1);
-    let out = `<line x1="0" x2="600" y1="${H / 2}" y2="${H / 2}" stroke="var(--edge)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
-    if (ref != null) out += `<line x1="0" x2="600" y1="${y(ref)}" y2="${y(ref)}" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>`;
-    if (sm.length > 1) out += `<polyline points="${sm.map((s, k) => (k / n * 600).toFixed(1) + ',' + y(s[idx])).join(' ')}" fill="none" stroke="var(--data-line)" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
-    $(sel).innerHTML = out;
+    const svg = $(sel), y = v => (H - 4 - v / max * (H - 10)).toFixed(1), id = svg.id;
+    if (!svg.dataset.ready){
+      // Squelette posé une fois : aire en dégradé, courbe, étincelle qui court dessus, point de tête et son onde
+      svg.innerHTML = `<defs><linearGradient id="${id}-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--c);stop-opacity:.38"/><stop offset="1" style="stop-color:var(--c);stop-opacity:0"/></linearGradient></defs>`
+        + `<line x1="0" x2="600" y1="${H / 2}" y2="${H / 2}" stroke="var(--edge)" stroke-width="1" vector-effect="non-scaling-stroke"/>`
+        + `<line class="ref" x1="0" x2="600" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>`
+        + `<path class="area" fill="url(#${id}-fill)"/>`
+        + `<polyline class="ln" fill="none" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`
+        + `<polyline class="flow" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" pathLength="100" stroke-dasharray="5 95" vector-effect="non-scaling-stroke"/>`
+        + `<line class="ring" stroke-linecap="round" vector-effect="non-scaling-stroke"/><line class="head" stroke-linecap="round" stroke-width="9" vector-effect="non-scaling-stroke"/>`;
+      svg.dataset.ready = '1';
+    }
+    const r = svg.querySelector('.ref'); r.style.display = ref != null ? '' : 'none'; if (ref != null){ r.setAttribute('y1', y(ref)); r.setAttribute('y2', y(ref)); }
+    const pts = sm.length > 1 ? sm.map((s, k) => [(k / n * 600).toFixed(1), y(s[idx])]) : [];
+    const pl = pts.map(q => q.join(',')).join(' ');
+    svg.querySelector('.ln').setAttribute('points', pl); svg.querySelector('.flow').setAttribute('points', pl);
+    svg.querySelector('.area').setAttribute('d', pts.length ? `M0 ${H} L${pts.map(q => q.join(' ')).join(' L')} L${pts[pts.length - 1][0]} ${H} Z` : '');
+    const last = pts[pts.length - 1];
+    svg.querySelectorAll('.ring,.head').forEach(e => { e.style.display = last ? '' : 'none'; if (last){ e.setAttribute('x1', last[0]); e.setAttribute('x2', last[0]); e.setAttribute('y1', last[1]); e.setAttribute('y2', last[1]); } });
   };
+  renderEffort();
   curve('#liveChart', 84, 1, Math.max(4, S.targetSpeed, ...sm.map(s => s[1])) * 1.1, S.mode ? S.targetSpeed : null);
   curve('#incChart', 56, 2, Math.max(5, ...sm.map(s => s[2])) * 1.1, null);
   $('#chartEmpty').hidden = sm.length > 1;
@@ -1828,6 +1868,34 @@ function render(){
 /* ---------- Appli installable : service worker (seulement à l'adresse en ligne, pas en fichier téléchargé) ---------- */
 if ('serviceWorker' in navigator && location.protocol === 'https:'){
   navigator.serviceWorker.register('sw.js').then(() => log('', 'Appli : service worker actif')).catch(e => log('err', 'Appli : service worker refusé (' + e.message + ')'));
+}
+
+/* ---------- Intensité de l'effort : couleur et rythme des courbes ---------- */
+// Même modèle d'effort que les calories (ACSM), sans le poids : 0 = marche lente à plat, 1 = 6 km/h à 12 % (ou course).
+// Racine carrée pour que la marche (4 à 6 km/h, 0 à 5 %) balaie déjà une bonne partie de l'échelle.
+const vo2 = (sp, inc) => { const v = sp * 1000 / 60, g = inc / 100; return sp < 8 ? 3.5 + 0.1 * v + 1.8 * v * g : 3.5 + 0.2 * v + 0.9 * v * g; };
+const EFFORT_STOPS = [[0, [196, 255, 58]], [.6, [255, 170, 31]], [1, [255, 90, 54]]];
+const ZONES = [[.35, 'Tranquille'], [.6, 'Actif'], [.8, 'Soutenu'], [2, 'Intense']];
+let effortZone = '';
+function effortColor(i){
+  let k = 1; while (k < EFFORT_STOPS.length - 1 && i > EFFORT_STOPS[k][0]) k++;
+  const [a0, c0] = EFFORT_STOPS[k - 1], [a1, c1] = EFFORT_STOPS[k], t = Math.min(1, Math.max(0, (i - a0) / (a1 - a0)));
+  return 'rgb(' + c0.map((c, j) => Math.round(c + (c1[j] - c) * t)).join(',') + ')';
+}
+function renderEffort(){
+  const run = S.status === 'running' && S.speed > 0.3;
+  const i = S.speed > 0.3 ? Math.sqrt(Math.min(1, Math.max(0, (vo2(S.speed, S.incline) - vo2(2, 0)) / (vo2(6, 12) - vo2(2, 0))))) : 0;
+  const st = document.documentElement.style;
+  st.setProperty('--i', i.toFixed(3));
+  st.setProperty('--effort', effortColor(i));
+  st.setProperty('--flow-dur', (3.2 - 2.2 * i).toFixed(2) + 's');
+  st.setProperty('--pulse-dur', (1.7 - 1 * i).toFixed(2) + 's');
+  st.setProperty('--belt-dur', Math.min(1.2, Math.max(.12, 1.8 / Math.max(S.speed, .1))).toFixed(2) + 's');
+  $$('.stats .ds-chart').forEach(c => c.classList.toggle('live', run));
+  const z = $('#effortZone'), name = run ? ZONES.find(q => i < q[0])[1] : '';
+  z.hidden = !name;
+  if (name && name !== effortZone){ z.textContent = name; if (effortZone){ z.classList.toggle('flash', false); void z.offsetWidth; z.classList.toggle('flash', true); } }
+  effortZone = name;
 }
 
 /* ---------- Horloge (1 s) ---------- */
