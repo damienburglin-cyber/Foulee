@@ -1726,9 +1726,12 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '26/11/2026 14:25';
+const APP_VERSION = '26/11/2026 14:33';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
+const progIncMax = p => Math.max(0, ...p.segments.map(s => s.i));
+// Dénivelé positif : distance de chaque étape × sa pente
+const progElev = p => Math.round(p.segments.reduce((a, s) => a + s.s * s.d / 3600 * 1000 * Math.max(0, s.i) / 100, 0));
 
 function launchProgram(id, runPid){
   const p = programs.find(x => x.id === id); if (!p) return;
@@ -1773,7 +1776,7 @@ function renderEditor(){
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="num" id="edSum" style="color:var(--muted);font-size:14px"></span><button class="btn ghost" id="edCancel">Annuler</button><button class="btn primary" id="edSave">Enregistrer</button></div></div>`;
   edSum();
 }
-function edSum(){ const el = $('#edSum'); if (el) el.textContent = hms(progDur(editing)) + ' · ≈ ' + fr2(progDist(editing)) + ' km'; const pf = $('#edProfile'); if (pf && editing.segments.length){ const orig = !editing.isNew && programs.find(x => x.id === editing.id), plan = orig ? orig.segments : null; if (!drawEqStatic(pf, editing.segments, plan, 1)) eqGrow(pf, editing.segments, plan); } }
+function edSum(){ const el = $('#edSum'); if (el) el.textContent = hms(progDur(editing)) + ' · ≈ ' + fr2(progDist(editing)) + ' km · pente max ' + progIncMax(editing) + ' % · D+ ' + progElev(editing) + ' m'; const pf = $('#edProfile'); if (pf && editing.segments.length){ const orig = !editing.isNew && programs.find(x => x.id === editing.id), plan = orig ? orig.segments : null; if (!drawEqStatic(pf, editing.segments, plan, 1)) eqGrow(pf, editing.segments, plan); } }
 
 // Programmes de Hugo : gardés dans la liste une fois terminés 2 fois (HUGO_KEEP) ; avant, en attente (8 au plus)
 const HUGO_KEEP = 2;
@@ -1792,7 +1795,7 @@ function renderPrograms(){
   $('#progList').innerHTML = programs.filter(progShown).map(p => `<article class="pcard" data-id="${p.id}">
     <h3>${p.name.replace(/</g, '&lt;')}${p.par ? '<span class="by">' + String(p.par).replace(/</g, '&lt;') + '</span>' : ''}</h3>
     <canvas class="profile eq" data-eq="${p.id}" role="img" aria-label="Égaliseur du programme : hauteur = effort de chaque moment"></canvas>
-    <div class="facts num"><span><b>${hms(progDur(p))}</b> durée</span><span><b>${fr2(progDist(p))}</b> km</span><span><b>${fr1(Math.max(...p.segments.map(s => s.s)))}</b> km/h max</span><span><b>${p.segments.length}</b> étapes</span></div>
+    <div class="facts num"><span><b>${hms(progDur(p))}</b> durée</span><span><b>${fr2(progDist(p))}</b> km</span><span><b>${fr1(Math.max(...p.segments.map(s => s.s)))}</b> km/h max</span><span><b>${progIncMax(p)} %</b> pente max</span><span><b>${progElev(p)} m</b> D+</span><span><b>${p.segments.length}</b> étapes</span></div>
     <div class="actions"><button class="btn primary small" data-a="run">Lancer</button><button class="btn small" data-a="edit">Modifier</button><button class="btn small" data-a="copy">Dupliquer</button><button class="btn small ghost" data-a="del">Supprimer</button></div>
   </article>`).join('') + (wait ? `<p class="ds-note">${wait} programme${wait > 1 ? 's' : ''} de Hugo en attente : ${wait > 1 ? 'ils rejoignent' : 'il rejoint'} la liste après ${HUGO_KEEP} séances terminées.</p>` : '') || '<div class="empty">Aucun programme. Crée le premier avec « Nouveau programme ».</div>';
   $$('#progList canvas[data-eq]').forEach(cv => { const p = programs.find(x => String(x.id) === cv.dataset.eq); if (p) eqGrow(cv, p.segments, null); });
@@ -2021,6 +2024,13 @@ function eqBounce(d, now, i, live){
   if (!live || skyCalm.matches) return 0;
   return st.v * (0.08 + 0.3 * i) * [1, 0.55, 0.3][Math.abs(d)];
 }
+// Bande de pente sous chaque égaliseur : 3 rangées de petits carreaux ambre, plus hautes quand ça monte, éteintes à plat
+const EQ_BAND = 14;
+const incAt = (list, t) => { let acc = 0; for (const q of list){ acc += q.d; if (t < acc) return q.i; } return list[list.length - 1].i; };
+function drawIncBand(g, x, cw, h, inc, maxI, alpha){
+  const rows = 3, bh = 3, bg = 1.5, lit = inc > 0 ? Math.max(1, Math.ceil(inc / maxI * rows)) : 0;
+  for (let k = 0; k < rows; k++){ g.fillStyle = k < lit ? `rgba(255,170,31,${alpha})` : 'rgba(255,255,255,.04)'; g.fillRect(x, h - (k + 1) * (bh + bg) + bg, cw, bh); }
+}
 function drawEq(cv, now, iNow, dt){
   const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
   if (!w || !h) return;
@@ -2031,7 +2041,7 @@ function drawEq(cv, now, iNow, dt){
   const relOf = q => span ? Math.min(1, Math.max(0, (vo2(q.s, q.i) - lo) / span)) : effortAbs(q.s, q.i);
   const relAt = t => { let acc = 0; for (const q of segs){ acc += q.d; if (t < acc) return relOf(q); } return relOf(segs[segs.length - 1]); };
   const gap = 2, N = Math.max(16, Math.min(64, Math.round(w / 11))), cw = (w - gap * (N - 1)) / N;
-  const ch = h >= 80 ? 5 : 4, R = Math.max(4, Math.floor((h + gap) / (ch + gap)));
+  const hE = h - EQ_BAND, ch = h >= 80 ? 5 : 4, R = Math.max(4, Math.floor((hE + gap) / (ch + gap))), maxI = Math.max(6, ...segs.map(q => q.i));
   const cur = Math.min(N - 1, Math.floor(Math.min(prog.t, tot - 1) / tot * N)), live = S.status === 'running';
   const G = rgbOf(effortColor(iNow)), DARK = [12, 15, 20], LIGHT = [236, 241, 246];
   for (let c = 0; c < N; c++){
@@ -2047,7 +2057,7 @@ function drawEq(cv, now, iNow, dt){
     const x = c * (cw + gap);
     if (d === 0){ g.shadowColor = `rgb(${G})`; g.shadowBlur = 6 + 12 * iNow; }
     for (let r = 0; r < R; r++){
-      const y = h - (r + 1) * (ch + gap) + gap;
+      const y = hE - (r + 1) * (ch + gap) + gap;
       if (r < lit){ const k = mixRGB(col, DARK, 0.28 * (1 - r / R)); g.fillStyle = `rgba(${k},${alpha})`; }
       else g.fillStyle = 'rgba(255,255,255,.035)';
       g.fillRect(x, y, cw, ch);
@@ -2055,8 +2065,9 @@ function drawEq(cv, now, iNow, dt){
     if (d === 0){
       g.shadowBlur = 0;
       const pr = Math.min(R - 1, Math.round(eq.peak));
-      if (pr >= lit){ g.fillStyle = `rgba(${mixRGB(G, LIGHT, 0.55)},.95)`; g.fillRect(x, h - (pr + 1) * (ch + gap) + gap, cw, ch); }
+      if (pr >= lit){ g.fillStyle = `rgba(${mixRGB(G, LIGHT, 0.55)},.95)`; g.fillRect(x, hE - (pr + 1) * (ch + gap) + gap, cw, ch); }
     }
+    drawIncBand(g, x, cw, h, d === 0 ? S.incline : incAt(segs, (c + 0.5) / N * tot), maxI, d < 0 ? 0.45 : d > 0 ? 0.35 : 1);
   }
 }
 // Égaliseur figé (aperçu du bilan) : chaque colonne à la couleur de son effort ; trait blanc = hauteur du programme actuel,
@@ -2070,8 +2081,8 @@ function drawEqStatic(cv, segs, plan, grow){
   const relOf = q => span ? Math.min(1, Math.max(0, (vo2(q.s, q.i) - lo) / span)) : effortAbs(q.s, q.i);
   const relAt = (list, t) => { let acc = 0; for (const q of list){ acc += q.d; if (t < acc) return relOf(q); } return relOf(list[list.length - 1]); };
   const tot = segs.reduce((a, q) => a + q.d, 0) || 1, gap = 2, N = Math.max(16, Math.min(64, Math.round(w / 11))), cw = (w - gap * (N - 1)) / N;
-  const ch = h >= 80 ? 5 : 4, R = Math.max(4, Math.floor((h + gap) / (ch + gap))), DARK = [12, 15, 20];
-  const rowY = r => h - (r + 1) * (ch + gap) + gap;
+  const hE = h - EQ_BAND, ch = h >= 80 ? 5 : 4, R = Math.max(4, Math.floor((hE + gap) / (ch + gap))), DARK = [12, 15, 20];
+  const rowY = r => hE - (r + 1) * (ch + gap) + gap, maxI = Math.max(6, ...segs.concat(plan || []).map(q => q.i));
   for (let c = 0; c < N; c++){
     const t = (c + 0.5) / N * tot, r1 = relAt(segs, t), lit = Math.max(1, Math.round((0.14 + 0.86 * r1) * R * grow));
     const old = plan ? Math.max(1, Math.round((0.14 + 0.86 * relAt(plan, t)) * R * grow)) : null;
@@ -2082,6 +2093,7 @@ function drawEqStatic(cv, segs, plan, grow){
       else { g.fillStyle = 'rgba(255,255,255,.035)'; g.fillRect(x, rowY(r), cw, ch); }
     }
     if (old != null && old !== lit){ g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(x, rowY(old - 1) - 2, cw, 1.5); }
+    drawIncBand(g, x, cw, h, Math.round(incAt(segs, t) * grow), maxI, 0.9);
   }
   return true;
 }
