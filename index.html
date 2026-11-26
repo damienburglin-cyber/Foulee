@@ -193,7 +193,7 @@ code{font-family:var(--f-mono);font-size:.9em;background:var(--sunk);padding:1px
 .big-prog .row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:2px 8px;font:700 18px/1.25 var(--font-body)}
 .big-prog .row b{font:600 20px/1.2 var(--font-display);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .big-prog .row span{white-space:nowrap;font-size:16px;color:var(--muted)}
-.big-prog .profile{height:96px}
+.big-prog .profile{height:124px}
 .big-next{font:700 20px/1.3 var(--font-body);color:var(--sage-ink)}
 .big-ctl{flex:1;min-height:150px;background:var(--card);border-radius:var(--radius-l);box-shadow:var(--shadow-card);padding:10px 12px;display:flex;flex-direction:column;justify-content:center;gap:4px}
 .big-lbl{display:flex;justify-content:space-between;font:700 18px/1.2 var(--font-body);color:var(--muted)}
@@ -217,7 +217,7 @@ code{font-family:var(--f-mono);font-size:.9em;background:var(--sunk);padding:1px
   .big-time{font-size:28px}
   .big-top .state{font-size:16px;padding:6px 12px}
   .big-prog{padding:8px 12px;gap:4px}
-  .big-prog .profile{height:40px}
+  .big-prog .profile{height:48px}
   .big-next{font-size:17px}
   .big-ctl{min-height:0;padding:6px 10px}
   .big-row button{min-height:76px;font-size:28px}
@@ -1726,7 +1726,7 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '26/11/2026 15:37';
+const APP_VERSION = '26/11/2026 15:58';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 const progIncMax = p => Math.max(0, ...p.segments.map(s => s.i));
@@ -2121,9 +2121,10 @@ function eqGrow(cv, segs, plan){
 // Sol en perspective qui défile vers soi à la vitesse du tapis, égaliseur sur la ligne d'horizon ; couleur et énergie suivent l'effort.
 // Dessiné dans la page, ou dans le grand écran quand il est ouvert (le canvas y est déplacé).
 const bgs = { last: 0, cols: [], ph: 0 };
-function bgSynth(g, w, h, C, en, now, dt){
-  const hz = Math.round(h * 0.42), cell = 8, step = 11, N = Math.ceil(w / step), R = Math.floor(h * 0.16 / step);
-  for (let c = 0; c < N; c++){
+function bgSynth(g, w, h, C, en, now, dt, horizon){
+  // horizon : ligne posée sous l'égaliseur du programme (grand écran), sans égaliseur de fond en plus
+  const sky = horizon == null, hz = sky ? Math.round(h * 0.42) : Math.round(horizon), cell = 8, step = 11, N = Math.ceil(w / step), R = Math.floor(h * 0.16 / step);
+  if (sky) for (let c = 0; c < N; c++){
     const st = bgs.cols[c] || (bgs.cols[c] = { v: 0, to: 0, next: 0 });
     if (now > st.next){ const mid = 1 - Math.abs(c / N - 0.5) * 1.2; st.to = en * mid * (0.3 + 0.7 * Math.random()); st.next = now + 1000 / (2 + 8 * en) * (0.6 + 0.8 * Math.random()); }
     st.v += (st.to - st.v) * Math.min(1, dt / 120);
@@ -2151,7 +2152,9 @@ function bgSynth(g, w, h, C, en, now, dt){
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
   const run = S.status === 'running', i = run ? effortNow() : 0, en = skyCalm.matches ? 0 : run ? 0.3 + 0.7 * i : 0.15;
   const C = rgbOf(effortColor(i)).join(',');
-  bgSynth(g, w, h, C, en, now, dt);
+  // Grand écran pendant un programme : l'horizon se cale sous l'égaliseur du programme
+  const bp = big.open && prog ? $('#bpProfile') : null, r = bp && bp.offsetParent !== null ? bp.getBoundingClientRect() : null;
+  bgSynth(g, w, h, C, en, now, dt, r && r.height ? r.bottom + 4 : null);
 })(0);
 
 /* ---------- Horloge (1 s) ---------- */
