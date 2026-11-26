@@ -1,42 +1,50 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#0b0d10;color:#eef2f5}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Foulée</title>
+<meta name="theme-color" content="#0b0d10">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%231a2129'/%3E%3Cstop offset='1' stop-color='%230b0d10'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='112' fill='url%28%23g%29'/%3E%3Cg fill='%23c4ff3a' transform='skewX%28-14%29'%3E%3Crect x='188' y='112' width='240' height='40' rx='20'/%3E%3Crect x='268' y='180' width='176' height='40' rx='20' opacity='.7'/%3E%3Crect x='348' y='248' width='112' height='40' rx='20' opacity='.42'/%3E%3C/g%3E%3Cpath d='M104 396 L408 320' stroke='%23c4ff3a' stroke-width='46' stroke-linecap='round'/%3E%3Ccircle cx='108' cy='395' r='11' fill='%230b0d10'/%3E%3Ccircle cx='404' cy='321' r='11' fill='%230b0d10'/%3E%3Cpath d='M168 430 L420 367' stroke='%23ffaa1f' stroke-width='14' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap">
 <style>
 /* Design system « Route des Vins à pied » (thème ivoire). Tokens repris de tokens.json, sans modification.
    Deux tokens proposés en plus, pour un usage en mouvement : --display-number (vitesse lue en marchant) et --tap-run (commandes touchées en marchant). */
 :root{
+  /* Look « console de tapis » : écran sombre, chiffres d'afficheur, vert vif = vitesse et données, ambre = pente, rouge = arrêt.
+     Mêmes noms de tokens que le DS « Route des Vins à pied » : seules les valeurs changent, la structure est intacte. */
   /* Couleurs */
-  --bg:#f2ede3; --panel:#f7f2e8; --panel2:#efe8da; --card:#fffdf9; --card2:#fffbf4; --track:#e9e1d2; --edge:#e4dbcb;
-  --ink:#2e2a24; --muted:#6b6153;
-  --gold:#b8914a; --gold-d:#7a5c25; --gold2:#d9bc82;
-  --green:#6f9460; --green-d:#4f7342; --wine:#8e3b46; --wine-d:#6e2c35; --sky:#5e86a8; --sky-d:#466a8a;
-  --good:#3f6b35; --bad:#a3324a; --ok-bg:#e2ecdb; --ok-ink:#3f5e34; --todo-bg:#f3e2bd; --todo-ink:#5e4520; --on-gold:#2b200c;
-  --data-line:#4f8f7e; --sage-100:#f0f6eb; --sage-200:#d2e2c6; --sage-900:#2f4a22;
-  --field:#fffdf8; --placeholder:#8c8273; --toast-ink:#3b2a10; --tooltip:var(--ink);
-  /* Typo */
-  --font-display:Lora,"Iowan Old Style",Georgia,"Noto Serif",serif;
+  --bg:#0b0d10; --panel:#14171c; --panel2:#1b1f26; --card:#1e232a; --card2:#111418; --track:#262c35; --edge:#2a3039;
+  --ink:#eef2f5; --muted:#8e98a4;
+  --gold:#ffaa1f; --gold-d:#ffc456; --gold2:#ffd78a;
+  --green:#a6ec3c; --green-d:#b8f53f; --wine:#ff4757; --wine-d:#d63344; --sky:#4c9bff; --sky-d:#2f7dff;
+  --good:#a6ec3c; --bad:#ff5b6b; --ok-bg:rgba(184,245,63,.13); --ok-ink:#c6fa63; --todo-bg:rgba(255,170,31,.15); --todo-ink:#ffc456; --on-gold:#1a1205;
+  --data-line:#c4ff3a; --sage-100:#e4ff9e; --sage-200:#b8f53f; --sage-900:#0b0d10;
+  --field:#101317; --placeholder:#69727d; --toast-ink:#1a1205; --tooltip:var(--ink);
+  --on-lime:#0b0d10; --glow:0 0 24px rgba(196,255,58,.35);
+  /* Typo : chiffres et titres en condensé façon afficheur, texte courant en Inter */
+  --font-display:"Barlow Condensed","Roboto Condensed","Arial Narrow",system-ui,sans-serif;
   --font-body:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-num:"Barlow Condensed","Roboto Condensed","Arial Narrow",system-ui,sans-serif;
   /* Espacements, rayons, ombres, tailles, courbes */
   --space-1:4px; --space-2:6px; --space-3:8px; --space-4:12px; --space-5:14px; --space-6:20px;
-  --radius-s:10px; --radius-m:12px; --radius-l:18px; --radius-xl:22px; --radius-pill:999px;
-  --shadow-relief:6px 6px 14px #ddd4c4, -6px -6px 14px #ffffff;
-  --shadow-card:0 0 0 1px rgba(120,92,45,.14), 0 1px 2px rgba(70,50,20,.08), 0 4px 12px rgba(70,50,20,.09);
-  --shadow-inset:inset 0 0 0 1px rgba(120,92,45,.15), inset 0 2px 5px rgba(70,50,20,.07);
+  --radius-s:8px; --radius-m:12px; --radius-l:16px; --radius-xl:20px; --radius-pill:999px;
+  --shadow-relief:0 0 0 1px rgba(255,255,255,.05), 0 12px 32px rgba(0,0,0,.45);
+  --shadow-card:inset 0 1px 0 rgba(255,255,255,.05), 0 0 0 1px rgba(255,255,255,.06), 0 2px 6px rgba(0,0,0,.35);
+  --shadow-inset:inset 0 0 0 1px rgba(255,255,255,.06), inset 0 2px 8px rgba(0,0,0,.55);
   --tap-min:44px; --tap-main:48px;
   --ease-bounce:cubic-bezier(.34,1.3,.5,1); --ease-out:cubic-bezier(.2,.8,.2,1);
   /* Proposés au DS */
-  --display-number:72px; --tap-run:64px;
+  --display-number:88px; --tap-run:64px;
   /* Alias de l'ancienne feuille : ils pointent tous vers des tokens du DS */
   --sunk:var(--panel2); --line:var(--edge); --gold-a:var(--gold2); --gold-b:var(--gold); --gold-ink:var(--gold-d);
-  --brown:var(--green-d); --brown-ink:#ffffff;
+  --brown:#e0985a; --brown-ink:#ffffff;
   --sage:var(--green); --sage-a:var(--green); --sage-soft:var(--ok-bg); --sage-ink:var(--ok-ink);
   --accent:var(--data-line); --incline:var(--gold);
-  --bad-soft:#f4e3e3; --warn:var(--todo-ink); --warn-soft:var(--todo-bg);
+  --bad-soft:rgba(255,71,87,.14); --warn:var(--todo-ink); --warn-soft:var(--todo-bg);
   --shadow:var(--shadow-card);
   --f-display:var(--font-display); --f-body:var(--font-body); --f-mono:var(--font-body);
-  --r:var(--radius-xl); color-scheme:light;
+  --r:var(--radius-xl); color-scheme:dark;
 }
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45;margin:0}
@@ -311,6 +319,101 @@ dialog.sheet::backdrop{background:rgba(46,42,36,.38)}
 .dl dt{color:var(--muted)} .dl dd{margin:0;font-variant-numeric:tabular-nums}
 .prose{font-size:13px;color:var(--muted);max-width:65ch;margin:0}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ===== Look console de tapis : surcouche visuelle, aucune règle de mise en page ===== */
+body{background:radial-gradient(1200px 600px at 50% -200px,#18202a 0%,var(--bg) 60%) fixed,var(--bg)}
+h1,h2,h3{letter-spacing:.01em}
+h2,.toolbar h2,.card h2,.ctl h2,.hero h2,.sheet-in h2{font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:19px}
+.label,.big-lbl,.big-metrics span,.ds-cell span,.hrow .c small,.ctab th{text-transform:uppercase;letter-spacing:.07em;font-size:11px}
+.big-lbl{font-size:15px}
+.num,.metric .v,.total .v,.ds-hero b,.hrow .c,.ds-cell b,.stepper button,.presets button,.big-time,.big-val .num,.big-metrics b,.big-row button{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+/* En-tête */
+.brand h1{font:800 30px/1 var(--font-display);text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:10px}
+.brand h1::before{content:"";width:12px;height:12px;border-radius:3px;background:var(--data-line);box-shadow:var(--glow);transform:skewX(-14deg)}
+.conn{border:1px solid var(--edge)}
+.chip.ok::before{box-shadow:0 0 10px currentColor}
+/* Panneaux : surface mate avec un liseré, comme le bandeau d'une console */
+.console,.ctl,.card,.hlist,.editor{border:1px solid var(--edge);background:linear-gradient(180deg,#171b21,var(--panel))}
+.console.live{position:relative;overflow:hidden;padding-bottom:calc(var(--space-5) + 14px)}
+/* Bande de tapis au pied de l'écran de vitesse ; elle défile quand le tapis tourne */
+.console.live::after{content:"";position:absolute;left:0;right:0;bottom:0;height:10px;background:repeating-linear-gradient(90deg,#20262e 0 18px,#14181d 18px 22px);border-top:1px solid var(--edge)}
+.console.live:has(.state.running)::after{animation:belt .6s linear infinite;background:repeating-linear-gradient(90deg,rgba(196,255,58,.28) 0 18px,#14181d 18px 22px)}
+@keyframes belt{to{background-position:-22px 0}}
+.hero .speed{font:800 var(--display-number)/.9 var(--font-num);color:var(--data-line);text-shadow:var(--glow);letter-spacing:-.01em}
+.hero .unit{font:700 22px var(--font-display);text-transform:uppercase;letter-spacing:.06em}
+.state{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.08em;font-size:14px;border:1px solid currentColor;background:transparent}
+.state{white-space:nowrap}.big-top .state{font-size:15px;padding:8px 12px}
+.state.running i{box-shadow:0 0 10px currentColor;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+.metric{background:var(--card2);border:1px solid var(--edge);border-left:3px solid var(--track)}
+.metric .v{font-size:30px;font-weight:700}
+.metric.inc{border-left-color:var(--gold)}.metric.inc .v{color:var(--gold)}
+.metric:first-child{border-left-color:var(--data-line)}
+.metric .v small{text-transform:uppercase;letter-spacing:.04em;font-size:12px}
+.ds-chart{background:var(--card2);border:1px solid var(--edge)}
+.ds-chart h4{text-transform:uppercase;letter-spacing:.06em;font-size:13px}
+.chart,.profile{background-image:repeating-linear-gradient(0deg,transparent 0 20px,rgba(255,255,255,.035) 20px 21px)}
+.profile{background-color:var(--card2)}
+/* Programme en cours */
+.prog-banner{border:1px solid var(--edge)}
+.xp i{background:linear-gradient(90deg,#7fbf1f,var(--data-line));box-shadow:0 0 12px rgba(196,255,58,.45)}
+/* Commandes */
+.ctl h2 .num{font-size:30px;color:var(--data-line)}
+.controls .ctl:nth-child(2) h2 .num{color:var(--gold)}
+.stepper button{font-size:24px;font-weight:700;background:linear-gradient(180deg,#252b33,var(--card))}
+.stepper button:active,.big-row button:active{transform:translateY(1px)}
+.presets button{font-size:16px;font-weight:700}
+.presets button.on{background:var(--data-line);color:var(--on-lime);box-shadow:var(--glow)}
+.presets button.on small{color:var(--on-lime)}
+#incPresets button.on{background:var(--gold);color:var(--on-gold);box-shadow:0 0 20px rgba(255,170,31,.35)}
+#incPresets button.on small{color:var(--on-gold)}
+.run button{font-family:var(--font-display);font-weight:800;font-size:22px;text-transform:uppercase;letter-spacing:.1em}
+.run .go{background:var(--data-line);color:var(--on-lime);box-shadow:var(--glow)}
+.run .pause{background:var(--gold);color:var(--on-gold);box-shadow:0 0 22px rgba(255,170,31,.35)}
+.run .stop{background:var(--wine);color:#fff;box-shadow:0 0 18px rgba(255,71,87,.3)}
+.btn{font-family:var(--font-body)}
+.btn.primary,#hgGo{background:var(--data-line);color:var(--on-lime);box-shadow:var(--glow)}
+.btn.sky{box-shadow:0 0 18px rgba(47,125,255,.35)}
+.btn.halt{background:var(--wine)}
+.hugo{border:1px solid var(--edge);border-left:6px solid var(--data-line)}
+.hugo h3{font:700 26px/1.1 var(--font-display);text-transform:uppercase;letter-spacing:.03em}
+.hugo .btn.primary{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.08em;font-size:20px}
+.notice{background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3)}
+/* Barre d'onglets */
+.ds-tabbar{filter:drop-shadow(0 10px 20px rgba(0,0,0,.6)) drop-shadow(0 0 1px rgba(255,255,255,.12))}
+.ds-tabbar::after{background:#181c22}
+.ds-tabbar .pill{background:radial-gradient(circle at 35% 30%,#e9ffad,var(--data-line) 70%);box-shadow:0 0 22px rgba(196,255,58,.5),inset 0 1px 0 rgba(255,255,255,.7)}
+.ds-tabbar button[aria-current="page"] .tl{color:var(--data-line)}
+/* Grand écran */
+.big{background:radial-gradient(900px 500px at 50% -150px,#18202a,var(--bg) 65%),var(--bg)}
+.big-time{font-size:44px;font-weight:700;letter-spacing:.02em}
+.big-prog,.big-ctl,.big-metrics div{border:1px solid var(--edge);background:var(--card2)}
+.big-prog .row b{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.04em}
+.big-next{color:var(--data-line);font-family:var(--font-display);font-size:22px;text-transform:uppercase;letter-spacing:.03em}
+.big-row button{font-size:38px;font-weight:700;background:linear-gradient(180deg,#252b33,var(--card))}
+.big-val .num{font-size:96px;font-weight:800;letter-spacing:-.01em}
+#bSpeed{color:var(--data-line);text-shadow:var(--glow)}
+#bInc{color:var(--gold);text-shadow:0 0 24px rgba(255,170,31,.35)}
+.big-val small{text-transform:uppercase;letter-spacing:.08em}
+.big-metrics b{font-size:32px;font-weight:700}
+.big .run button{font-size:28px}
+@media (orientation:landscape) and (max-height:560px){.big-val .num{font-size:60px}.big-time{font-size:32px}}
+/* Programmes, historique, réglages */
+.pcard,.total,.step{border:1px solid var(--edge)}
+.pcard h3,.step-n{font:700 21px/1.15 var(--font-display);text-transform:uppercase;letter-spacing:.03em}
+.hrow .when b{font-family:var(--font-display);font-size:20px;text-transform:uppercase;letter-spacing:.03em}
+.hrow .c,.ds-cell{background:var(--card2);border:1px solid var(--edge)}
+.total .v{font-size:32px;color:var(--data-line)}
+.ds-hero{border:1px solid var(--edge)}.ds-hero b{font-size:32px;color:var(--data-line)}
+.field input,.field select{border-color:var(--edge)}
+.field input::placeholder{color:var(--placeholder)}
+.log{background:#07090b;color:#b9c2cc;font-family:ui-monospace,"SF Mono",Menlo,monospace}
+.log .rx{color:var(--data-line)}
+.toast{background:var(--gold);color:var(--toast-ink);box-shadow:0 8px 24px rgba(0,0,0,.5)}
+dialog.sheet::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(3px)}
+.sheet-in{border:1px solid var(--edge);border-bottom:none;background:linear-gradient(180deg,#191d24,var(--panel))}
+.kbd kbd{background:var(--card);border-color:var(--edge)}
+@media (prefers-reduced-motion:reduce){.console.live::after,.state.running i{animation:none!important}}
 </style>
 
 <div class="wrap">
@@ -1493,7 +1596,7 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '26/11/2026 08:15';
+const APP_VERSION = '26/11/2026 09:03';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 
