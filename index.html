@@ -481,6 +481,17 @@ canvas.profile.eq{background-color:rgba(8,11,15,.3);filter:none}
 .upd .prose{margin:0}
 .upd-row{display:flex;gap:8px;flex-wrap:wrap}.upd-row .btn{flex:1 1 200px}
 
+/* ===== Progression ===== */
+.pgcard{gap:var(--space-3)}
+.seg{display:inline-flex;gap:4px;padding:3px;border-radius:var(--radius-pill);background:var(--card2);border:1px solid var(--edge);flex-wrap:wrap}
+.seg button{all:unset;cursor:pointer;min-height:36px;padding:0 14px;display:inline-flex;align-items:center;border-radius:var(--radius-pill);font:700 13px/1 var(--font-display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--data-line);color:var(--on-lime);box-shadow:var(--glow)}
+.seg button:focus-visible{outline:3px solid var(--gold-d);outline-offset:1px}
+.seg-m{display:flex;justify-content:space-between}.seg-m button{flex:1;justify-content:center;padding:0 6px}
+.pgsel{margin:0;font:700 15px/1.3 var(--font-display);text-transform:uppercase;letter-spacing:.03em;color:var(--ink)}
+.pgchart{width:100%;height:160px;display:block;cursor:pointer;touch-action:manipulation}
+.pgcells{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (min-width:700px){.pgcells{grid-template-columns:repeat(4,minmax(0,1fr))}}
 /* ===== Barre d'onglets plus vive : 0,35 s, courbe douce à léger dépassement (au lieu de 0,75 s avec gros rebond) ===== */
 :root{--ease-tab:cubic-bezier(.3,1.15,.55,1)}
 .ds-tabbar{transition:--nx .35s var(--ease-tab)}
@@ -594,6 +605,14 @@ canvas.profile.eq{background-color:rgba(8,11,15,.3);filter:none}
   <!-- HISTORIQUE -->
   <section id="tab-historique" hidden>
     <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card pgcard" id="progress">
+        <div class="toolbar"><h2>Progression</h2><div class="seg" id="pgPer"><button type="button" data-per="day" aria-pressed="false">Jour</button><button type="button" data-per="week" aria-pressed="true">Semaine</button></div></div>
+        <div class="seg seg-m" id="pgMetric"><button type="button" data-m="distance" aria-pressed="true">Distance</button><button type="button" data-m="duration" aria-pressed="false">Temps</button><button type="button" data-m="kcal" aria-pressed="false">Calories</button><button type="button" data-m="elev" aria-pressed="false">D+</button></div>
+        <p class="pgsel num" id="pgSel"></p>
+        <canvas class="pgchart" id="pgChart" role="img" aria-label="Progression en colonnes de carreaux ; touche une colonne pour son détail"></canvas>
+        <div class="ds-cells pgcells" id="pgCells"></div>
+        <p class="ds-note" id="pgNote">Séances du mode démo et exemples non comptés.</p>
+      </div>
       <div class="totals" id="totals"></div>
       <div class="toolbar"><h2>Dernières séances</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small" id="btnCopyHist">Copier en JSON</button><button class="btn small ghost" id="btnClearEx" hidden>Retirer les exemples</button></div></div>
       <div class="hlist" id="histList"></div>
@@ -1726,7 +1745,7 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '26/11/2026 15:58';
+const APP_VERSION = '26/11/2026 16:59';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 const progIncMax = p => Math.max(0, ...p.segments.map(s => s.i));
@@ -1818,6 +1837,7 @@ function sparkSVG(samples, W, H){
 }
 function renderHistory(){
   const h = store.get('sessions', []);
+  renderProgress(true);
   const wk = Date.now() - 7 * 864e5, w = h.filter(s => s.start >= wk);
   const sum = (a, f) => a.reduce((x, s) => x + (s[f] || 0), 0);
   $('#totals').innerHTML = [
@@ -1837,6 +1857,96 @@ function renderHistory(){
       <button class="iconbtn del" data-a="del" title="Supprimer la séance" aria-label="Supprimer la séance">${ICON.x}</button></div>`;
   }).join('') : '<div class="empty">Aucune séance pour l\'instant. Chaque séance de plus de 20 secondes s\'enregistre ici à l\'arrêt du tapis.</div>';
 }
+
+/* ---------- Progression : jour après jour (14 jours) ou semaine après semaine (12 semaines) ---------- */
+const pg = { per: 'week', m: 'distance', sel: null, anim: 0 };
+const PG_M = {
+  distance: { l: 'Distance', u: ' km', f: s => s.distance || 0, fmt: v => fr2(v) },
+  duration: { l: 'Temps', u: '', f: s => s.duration || 0, fmt: v => hms(Math.round(v)) },
+  kcal: { l: 'Calories', u: ' kcal', f: s => s.kcal || 0, fmt: v => String(Math.round(v)) },
+  elev: { l: 'D+', u: ' m', f: s => s.elevation != null ? s.elevation : (s.samples && s.samples.length > 1 ? sessionStats(s.samples).elevation || 0 : 0), fmt: v => String(Math.round(v)) }
+};
+const pgDay = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+const pgWeek = t => { const d = new Date(pgDay(t)); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d.getTime(); }; // lundi
+const isoWeek = t => { const d = new Date(pgDay(t)); d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7); const y = new Date(d.getFullYear(), 0, 4); return 1 + Math.round(((d - y) / 864e5 - 3 + (y.getDay() + 6) % 7) / 7); };
+function pgData(){
+  const h = store.get('sessions', []).filter(s => !s.example && s.source !== 'demo'), day = pg.per === 'day', kf = day ? pgDay : pgWeek, M = PG_M[pg.m];
+  const n = day ? 14 : 12, keys = [];
+  for (let k = n - 1; k >= 0; k--){ const d = new Date(kf(Date.now())); d.setDate(d.getDate() - (day ? k : 7 * k)); keys.push(kf(d.getTime())); }
+  const vals = keys.map(() => 0), cnt = keys.map(() => 0), all = {};
+  h.forEach(s => { const k = kf(s.start), v = M.f(s); all[k] = (all[k] || 0) + v; const i = keys.indexOf(k); if (i >= 0){ vals[i] += v; cnt[i]++; } });
+  // Période précédente « au même stade » : la période en cours n'est pas finie, on compare ce qui est comparable
+  const into = Date.now() - keys[n - 1];
+  const prevSoFar = h.reduce((a, s) => a + (kf(s.start) === keys[n - 2] && s.start - keys[n - 2] <= into ? M.f(s) : 0), 0);
+  // Série : jours d'affilée avec au moins une séance, jusqu'à aujourd'hui (ou hier si rien encore aujourd'hui)
+  const days = new Set(h.map(s => pgDay(s.start))); let streak = 0, d = new Date(pgDay(Date.now()));
+  if (!days.has(d.getTime())) d.setDate(d.getDate() - 1);
+  while (days.has(d.getTime())){ streak++; d.setDate(d.getDate() - 1); }
+  const labels = keys.map(k => day ? String(new Date(k).getDate()) : 'S' + isoWeek(k));
+  return { keys, vals, cnt, prevSoFar, best: Math.max(0, ...Object.values(all)), streak, labels, day, M, any: h.length > 0 };
+}
+function pgLabel(D, i){
+  const k = D.keys[i], last = i === D.keys.length - 1;
+  if (D.day) return last ? 'Aujourd\'hui' : i === D.keys.length - 2 ? 'Hier' : new Date(k).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' });
+  const e = new Date(k); e.setDate(e.getDate() + 6);
+  return (last ? 'Cette semaine' : 'Semaine ' + isoWeek(k)) + ' (' + new Date(k).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' – ' + e.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ')';
+}
+function drawProgress(cv, D, grow){
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  if (!w || !h) return false;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)){ cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const N = D.vals.length, gap = 3, cw = (w - gap * (N - 1)) / N, ch = 5, cg = 2, lab = 16, top = 16;
+  const R = Math.max(4, Math.floor((h - lab - top + cg) / (ch + cg))), max = Math.max(...D.vals) || 1, DARK = [12, 15, 20], sel = pg.sel == null ? N - 1 : pg.sel;
+  g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  for (let c = 0; c < N; c++){
+    const v = D.vals[c], rel = v / max, lit = v > 0 ? Math.max(1, Math.round(rel * R * grow)) : 0, x = c * (cw + gap), on = c === sel;
+    const col = mixRGB(rgbOf(effortColor(rel)), DARK, 0.3 * (1 - rel)), a = on ? 1 : 0.7;
+    if (on && v > 0){ g.shadowColor = `rgb(${col})`; g.shadowBlur = 12; }
+    for (let r = 0; r < R; r++){
+      const y = h - lab - (r + 1) * (ch + cg) + cg;
+      g.fillStyle = r < lit ? `rgba(${mixRGB(col, DARK, 0.25 * (1 - r / R))},${a})` : (on ? 'rgba(255,255,255,.08)' : 'rgba(255,255,255,.035)');
+      g.fillRect(x, y, cw, ch);
+    }
+    g.shadowBlur = 0;
+    g.font = (on ? '700 ' : '600 ') + '11px "Barlow Condensed", "Arial Narrow", sans-serif';
+    g.fillStyle = on ? '#eef2f5' : '#8e98a4';
+    if (D.day || N <= 12) g.fillText(D.labels[c], x + cw / 2, h - 3);
+    if (on && v > 0 && grow >= 1){ g.font = '700 12px "Barlow Condensed", "Arial Narrow", sans-serif'; g.fillStyle = '#eef2f5'; g.fillText(D.M.fmt(v), x + cw / 2, Math.max(12, h - lab - lit * (ch + cg) - 4)); }
+  }
+  return true;
+}
+function renderProgress(animate){
+  const D = pgData(), N = D.vals.length;
+  if (pg.sel != null && pg.sel >= N) pg.sel = null;
+  const i = pg.sel == null ? N - 1 : pg.sel, cur = D.vals[N - 1], prev = D.prevSoFar, M = D.M;
+  $('#pgSel').textContent = pgLabel(D, i) + ' : ' + M.fmt(D.vals[i]) + M.u + ' · ' + D.cnt[i] + ' séance' + (D.cnt[i] > 1 ? 's' : '');
+  const delta = prev > 0 ? Math.round((cur - prev) / prev * 100) : null;
+  const cells = [
+    [D.day ? 'Aujourd\'hui' : 'Cette semaine', M.fmt(cur) + M.u],
+    [D.day ? 'Par rapport à hier, même heure' : 'Par rapport à la semaine dernière, même stade', delta == null ? (cur > 0 ? 'Nouveau' : '–') : (delta > 0 ? '▲ +' : delta < 0 ? '▼ ' : '= ') + delta + ' %'],
+    [D.day ? 'Meilleur jour' : 'Meilleure semaine', M.fmt(D.best) + M.u],
+    ['Série', D.streak + ' jour' + (D.streak > 1 ? 's' : '') + ' d\'affilée']
+  ];
+  $('#pgCells').innerHTML = cells.map(([l, v]) => `<div class="ds-cell"><span>${l}</span><b>${v}</b></div>`).join('');
+  $('#pgNote').textContent = D.any ? 'Séances du mode démo et exemples non comptés.' : 'Pas encore de séance sur le tapis : la progression se remplit à chaque séance enregistrée (mode démo et exemples non comptés).';
+  $$('#pgPer button').forEach(b => b.setAttribute('aria-pressed', b.dataset.per === pg.per));
+  $$('#pgMetric button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === pg.m));
+  const cv = $('#pgChart'), id = ++pg.anim, t0 = performance.now(), calm = skyCalm.matches || !animate;
+  const step = now => {
+    if (id !== pg.anim) return;
+    const k = calm ? 1 : Math.min(1, (now - t0) / 600), e = k === 1 ? 1 : 1 + 1.7 * Math.pow(k - 1, 3) + 0.7 * Math.pow(k - 1, 2);
+    if (!drawProgress(cv, D, e) && now - t0 < 3000) return requestAnimationFrame(step);
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+$('#pgPer').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; pg.per = b.dataset.per; pg.sel = null; renderProgress(true); });
+$('#pgMetric').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; pg.m = b.dataset.m; renderProgress(true); });
+$('#pgChart').addEventListener('click', e => {
+  const r = e.currentTarget.getBoundingClientRect(), n = pg.per === 'day' ? 14 : 12;
+  pg.sel = Math.min(n - 1, Math.max(0, Math.floor((e.clientX - r.left) / r.width * n))); renderProgress(false);
+});
 
 /* ---------- Rendu séance ---------- */
 const LABEL = { off: 'Déconnecté', idle: "À l'arrêt", starting: 'Démarrage', running: 'En marche', paused: 'En pause', error: 'Erreur' };
