@@ -485,6 +485,14 @@ body,.big{background:
 .big-prog,.big-ctl,.big-metrics div{background:rgba(17,21,27,.7)}
 @media (prefers-reduced-motion:reduce){.starsky::before,.starsky::after{animation:none!important}.star{display:none}}
 
+/* ===== Tuiles translucides : le ciel se voit à travers ; barre d'onglets et champs restent opaques ===== */
+:root{--card:rgba(40,47,58,.5);--card2:rgba(8,11,15,.38);--panel2:rgba(34,40,50,.5)}
+.console,.ctl,.card,.hlist,.editor{background:linear-gradient(180deg,rgba(30,36,45,.52),rgba(19,23,29,.6))}
+.conn{background:rgba(22,27,34,.6)}
+.stepper button,.big-row button{background:linear-gradient(180deg,rgba(52,60,72,.55),rgba(30,36,45,.5))}
+.big-prog,.big-ctl,.big-metrics div{background:rgba(17,21,27,.5)}
+.profile{background-color:rgba(8,11,15,.35)}
+
 .console.live:has(.state.running)::after{animation-duration:var(--belt-dur)}
 @media (prefers-reduced-motion:reduce){.ds-chart.live .flow{opacity:0}}
 </style>
@@ -1677,7 +1685,7 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '26/11/2026 11:21';
+const APP_VERSION = '26/11/2026 12:30';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 
