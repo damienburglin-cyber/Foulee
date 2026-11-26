@@ -493,6 +493,22 @@ body,.big{background:
 .big-prog,.big-ctl,.big-metrics div{background:rgba(17,21,27,.5)}
 .profile{background-color:rgba(8,11,15,.35)}
 
+/* ===== Égaliseur du parcours (canvas) et proposition de mise à jour du programme ===== */
+canvas.profile.eq{background-color:rgba(8,11,15,.3);filter:none}
+.upd{display:grid;gap:8px;padding:12px;border-radius:var(--radius-l);border:1px solid var(--edge);background:var(--card2)}
+.upd.strong{border-color:color-mix(in srgb,var(--data-line) 55%,transparent);background:color-mix(in srgb,var(--data-line) 7%,transparent);box-shadow:0 0 18px rgba(196,255,58,.12)}
+.upd-t{margin:0;font:700 17px/1.2 var(--font-display);text-transform:uppercase;letter-spacing:.04em}
+.upd.strong .upd-t{color:var(--data-line)}
+.upd .prose{margin:0}
+.upd-row{display:flex;gap:8px;flex-wrap:wrap}.upd-row .btn{flex:1 1 200px}
+
+/* ===== Barre d'onglets plus vive : 0,35 s, courbe douce à léger dépassement (au lieu de 0,75 s avec gros rebond) ===== */
+:root{--ease-tab:cubic-bezier(.3,1.15,.55,1)}
+.ds-tabbar{transition:--nx .35s var(--ease-tab)}
+.ds-tabbar .pill{transition:transform .35s var(--ease-tab)}
+.ds-tabbar button svg{transition:transform .32s var(--ease-tab)}
+.ds-tabbar .tl{transition:opacity .2s .08s}
+
 .console.live:has(.state.running)::after{animation-duration:var(--belt-dur)}
 @media (prefers-reduced-motion:reduce){.ds-chart.live .flow{opacity:0}}
 </style>
@@ -527,7 +543,7 @@ body,.big{background:
       <div class="prog-banner" id="progBanner" hidden>
         <div class="row"><h3 id="pbName">Programme</h3><span class="prow"><span class="zone" data-zone hidden></span><span class="meta pill num" id="pbMeta"></span></span></div>
         <div class="xp" id="pbXp" role="progressbar" aria-label="Avancement du programme" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="pbBar"></i></div>
-        <svg class="profile" id="pbProfile" viewBox="0 0 600 64" preserveAspectRatio="none"></svg>
+        <canvas class="profile eq" id="pbProfile" role="img" aria-label="Égaliseur du parcours : une colonne par moment du programme, hauteur = effort prévu"></canvas>
         <div class="row"><span class="meta" id="pbNext"></span><button class="btn small ghost" id="pbQuit">Quitter le programme</button></div>
       </div>
       <div class="hero">
@@ -663,6 +679,12 @@ body,.big{background:
       <h4>Inclinaison <small>%</small></h4>
       <svg class="chart" id="sumInc" viewBox="0 0 600 56" preserveAspectRatio="none" role="img" aria-label="Courbe d'inclinaison de la séance" style="height:56px"></svg>
     </div>
+    <div class="upd" id="sumUpd" hidden>
+      <p class="upd-t" id="sumUpdTitle"></p>
+      <p class="prose" id="sumUpdText"></p>
+      <svg class="profile" id="sumUpdProfile" viewBox="0 0 600 64" preserveAspectRatio="none" role="img" aria-label="Programme mis à jour ; en pointillés, le programme actuel"></svg>
+      <div class="upd-row"><button type="button" class="btn" id="sumUpdGo"></button><button type="button" class="btn" id="sumUpdCopy">Enregistrer comme nouveau programme</button></div>
+    </div>
     <details class="sum-more"><summary>Plus de détails</summary><div class="ds-cells" id="sumMore"></div></details>
     <details class="sum-more" id="sumLogBox"><summary>Journal Bluetooth de la séance</summary>
       <p class="prose" style="margin:6px 0">À envoyer à Claude si quelque chose cloche : « Partager » ouvre le partage du téléphone, choisis Claude.</p>
@@ -684,7 +706,7 @@ body,.big{background:
   </div>
   <div class="big-prog" id="bProg" hidden>
     <div class="row"><b id="bpName"></b><span class="prow"><span class="zone" data-zone hidden></span><span class="num" id="bpMeta"></span></span></div>
-    <svg class="profile" id="bpProfile" viewBox="0 0 600 96" preserveAspectRatio="none" role="img" aria-label="Profil du programme, trait = position actuelle"></svg>
+    <canvas class="profile eq" id="bpProfile" role="img" aria-label="Égaliseur du parcours : une colonne par moment du programme, hauteur = effort prévu"></canvas>
     <div class="big-next" id="bpNext"></div>
   </div>
   <div class="big-ctl">
@@ -1297,6 +1319,8 @@ function finishSession(){
     h.forEach((x, k) => { if (k >= 5) delete x.log; });
     store.set('sessions', h.slice(0, 200));
     log('', 'Séance enregistrée : ' + hms(el) + ', ' + fr2(s.distance) + ' km');
+    s.update = progUpdateProposal();
+    if (s.update){ const hh = store.get('sessions', []); if (hh[0] && hh[0].id === s.id){ hh[0].update = s.update; store.set('sessions', hh); } }
     showSummary(s, true);
   }
   session = null; prog = null; renderHistory();
@@ -1427,6 +1451,62 @@ function lineSVG(sm, idx, H){
   const pts = sm.map((x, k) => (k / n * 600).toFixed(1) + ',' + (H - 4 - x[idx] / max * (H - 10)).toFixed(1)).join(' ');
   return `<line x1="0" x2="600" y1="${H / 2}" y2="${H / 2}" stroke="var(--edge)" stroke-width="1" vector-effect="non-scaling-stroke"/><polyline points="${pts}" fill="none" stroke="var(--data-line)" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
 }
+// Programme ajusté pendant la séance : pour chaque étape, la consigne tenue le plus longtemps (réglages à la main compris).
+// big = assez de changements pour le proposer franchement (2 étapes ou plus, 15 % de la durée, ou un écart d'au moins 0,5 km/h ou 2 %).
+function progUpdateProposal(){
+  if (!prog || !(prog.edits || []).length) return null;
+  const plan = prog.p.segments, eff = progEffective(prog); if (!eff) return null;
+  let pos = 0; const pieces = eff.map(q => { const r = { a: pos, b: pos + q.d, s: Math.round(q.s * 10) / 10, i: Math.round(q.i) }; pos += q.d; return r; });
+  const out = []; let t0 = 0;
+  plan.forEach(sg => {
+    const t1 = t0 + sg.d, wt = {};
+    pieces.forEach(q => { const o = Math.min(t1, q.b) - Math.max(t0, q.a); if (o > 0){ const k = q.s + '|' + q.i; wt[k] = (wt[k] || 0) + o; } });
+    const best = (Object.entries(wt).sort((x, y) => y[1] - x[1])[0] || [sg.s + '|' + sg.i])[0].split('|');
+    out.push({ d: sg.d, s: +best[0], i: +best[1] }); t0 = t1;
+  });
+  const diff = (q, k) => Math.abs(q.s - plan[k].s) >= 0.1 || q.i !== plan[k].i;
+  const ch = out.filter(diff); if (!ch.length) return null;
+  const chT = out.reduce((a, q, k) => a + (diff(q, k) ? q.d : 0), 0);
+  const bigGap = out.some((q, k) => Math.abs(q.s - plan[k].s) >= 0.5 || Math.abs(q.i - plan[k].i) >= 2);
+  return { id: prog.p.id, name: prog.p.name, plan: JSON.parse(JSON.stringify(plan)), segments: out, changed: ch.length, steps: plan.length, big: ch.length >= 2 || chT / progDur(prog.p) >= 0.15 || bigGap };
+}
+// Programme Foulée (remis à jour par « Synchroniser ») ou de Hugo : on propose une copie plutôt que de le modifier
+const progLocked = p => ADDED.some(a => a.id === p.id) || !!p.pid;
+function renderUpdate(s){
+  const box = $('#sumUpd'), u = s.update, p = u && programs.find(x => x.id === u.id);
+  const same = p && progSig(p) === progSig({ segments: u.segments });
+  box.hidden = !u || u.applied || same;
+  if (box.hidden) return;
+  const locked = !p || progLocked(p), nm = '« ' + u.name + ' »';
+  box.classList.toggle('strong', !!u.big);
+  $('#sumUpdTitle').textContent = u.big ? 'Tu as pas mal modifié ' + nm : 'Programme ajusté pendant la séance';
+  $('#sumUpdText').textContent = u.changed + ' étape' + (u.changed > 1 ? 's' : '') + ' sur ' + u.steps + ' réglée' + (u.changed > 1 ? 's' : '') + ' autrement. '
+    + (locked ? (p ? (p.pid ? 'C\'est un programme de Hugo' : 'C\'est un programme Foulée, remis à jour par « Synchroniser »') + ' : enregistre plutôt ta version comme un nouveau programme.' : 'Le programme n\'existe plus : tu peux enregistrer ta version comme un nouveau programme.')
+      : 'Mettre le programme à jour avec ce que tu as fait ?') + ' En pointillés : le programme actuel.';
+  $('#sumUpdProfile').innerHTML = profileSVG(u.segments, 600, 64, null, u.plan);
+  const go = $('#sumUpdGo'), cp = $('#sumUpdCopy');
+  go.hidden = locked; go.textContent = 'Mettre à jour ' + nm;
+  go.className = 'btn ' + (u.big ? 'primary' : '');
+  cp.className = 'btn ' + (locked && u.big ? 'primary' : '');
+}
+function markApplied(s){
+  s.update.applied = true;
+  const hh = store.get('sessions', []), x = hh.find(q => q.id === s.id); if (x && x.update){ x.update.applied = true; store.set('sessions', hh); }
+  renderUpdate(s);
+}
+$('#sumUpdGo').addEventListener('click', () => {
+  const s = sumCur, u = s && s.update, p = u && programs.find(x => x.id === u.id); if (!p) return;
+  p.segments = JSON.parse(JSON.stringify(u.segments)); saveProgs(); renderPrograms();
+  log('', 'Programme « ' + p.name + ' » mis à jour avec la séance (' + u.changed + ' étape(s))');
+  toast('« ' + p.name + ' » mis à jour'); markApplied(s);
+});
+$('#sumUpdCopy').addEventListener('click', () => {
+  const s = sumCur, u = s && s.update; if (!u) return;
+  const name = u.name.replace(/ \(ajusté\)$/, '') + ' (ajusté)';
+  programs.push({ id: 'p' + Date.now(), name, segments: JSON.parse(JSON.stringify(u.segments)) }); saveProgs(); renderPrograms();
+  log('', 'Nouveau programme « ' + name + ' » créé depuis la séance');
+  toast('« ' + name + ' » ajouté à tes programmes'); markApplied(s);
+});
 function showSummary(s, justEnded){
   sumCur = s; $('#sumSendBox').hidden = true; $('#sumCode').value = ''; $('#sumSend').hidden = !!s.example;
   const st = sessionStats(s.samples);
@@ -1456,6 +1536,7 @@ function showSummary(s, justEnded){
   $('#sumSpeed').innerHTML = lineSVG(s.samples, 1, 84);
   $('#sumInc').innerHTML = lineSVG(s.samples, 2, 56);
   $('#sumCharts').hidden = !(s.samples && s.samples.length > 1);
+  renderUpdate(s);
   const lines = s.log || [];
   $('#sumLogBox').hidden = !lines.length;
   $('#sumLog').textContent = lines.join('\n');
@@ -1581,23 +1662,6 @@ function progEffective(pr){
   });
   return out;
 }
-// Profil du programme en cours : consignes réelles, et en pointillés le programme prévu là où il a été modifié
-function paintProfile(sel, W, H){
-  const svg = $(sel);
-  if (!svg.dataset.ready){
-    svg.innerHTML = `<g class="pbase"></g><polyline class="flow" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" pathLength="100" stroke-dasharray="4 96" vector-effect="non-scaling-stroke"/><line class="ring" stroke-linecap="round" vector-effect="non-scaling-stroke"/><line class="head" stroke-linecap="round" stroke-width="10" vector-effect="non-scaling-stroke"/>`;
-    svg.dataset.ready = '1';
-  }
-  svg.querySelector('.pbase').innerHTML = progProfile(W, H);
-  // Même géométrie que profileSVG : tracé du haut pour l'étincelle, position actuelle pour la tête
-  const segs = progEffective(prog) || prog.p.segments, all = segs.concat(prog.p.segments);
-  const tot = segs.reduce((a, q) => a + q.d, 0) || 1, maxS = Math.max(4, ...all.map(q => q.s)), HS = H - 16, yOf = v => (HS - 2 - v / maxS * (HS - 6)).toFixed(1);
-  let x = 0, pts = [], acc = 0, yNow = yOf(segs[0].s);
-  segs.forEach(q => { const x2 = x + q.d / tot * W; pts.push(x.toFixed(1) + ',' + yOf(q.s), x2.toFixed(1) + ',' + yOf(q.s)); if (prog.t >= acc) yNow = yOf(q.s); acc += q.d; x = x2; });
-  svg.querySelector('.flow').setAttribute('points', pts.join(' '));
-  const cx = (Math.min(1, prog.t / tot) * W).toFixed(1);
-  svg.querySelectorAll('.ring,.head').forEach(e => { e.setAttribute('x1', cx); e.setAttribute('x2', cx); e.setAttribute('y1', yNow); e.setAttribute('y2', yNow); });
-}
 function progProfile(W, H){ const e = progEffective(prog); return e ? profileSVG(e, W, H, prog.t, prog.p.segments) : profileSVG(prog.p.segments, W, H, prog.t); }
 function adoptFromBelt(){
   const sp = Math.round(S.speed * 10) / 10, inc = Math.round(S.incline / incStep()) * incStep();
@@ -1685,7 +1749,7 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '26/11/2026 12:30';
+const APP_VERSION = '26/11/2026 13:13';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 
@@ -1853,7 +1917,6 @@ function renderBig(){
     $('#bpName').textContent = prog.p.name;
     $('#bpMeta').textContent = $('#pbMeta').textContent;
     $('#bpNext').textContent = $('#pbNext').textContent;
-    paintProfile('#bpProfile', 600, 96);
   }
 }
 function renderInfo(){ $('#devInfo').innerHTML = Object.entries(S.info).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('') || '<dt>État</dt><dd>Non connecté</dd>'; }
@@ -1905,7 +1968,6 @@ function render(){
     const startTxt = S.status === 'starting' ? 'Le tapis démarre' + (S.countdown > 0 ? ' dans ' + S.countdown + ' s' : '') + ' à ' + fr1(S.targetSpeed) + ' km/h, ' + frI(S.targetIncline) + ' %.'
       : boot ? 'Mise en vitesse : ' + fr1(S.speed) + ' → ' + fr1(S.targetSpeed) + ' km/h. Ce temps ne compte pas dans le programme.' : '';
     $('#pbNext').textContent = startTxt || adj + (nx ? 'Dans ' + hms(acc - prog.t) + ' : ' + fr1(nx.s) + ' km/h, ' + nx.i + ' %' : 'Dernière étape');
-    paintProfile('#pbProfile', 600, 64);
     const pc = Math.min(100, Math.round(prog.t / tot * 100)); $('#pbBar').style.width = pc + '%'; $('#pbXp').setAttribute('aria-valuenow', pc);
   } else pb.hidden = true;
 
@@ -2010,6 +2072,65 @@ function shootStar(i){
   // Au repos : une toutes les 5 à 9 s ; en séance : de toutes les 2,6 s (calme) à toutes les 0,6 s (intense)
   setTimeout(skyLoop, run ? 2600 - i * 2000 + Math.random() * 700 : 5000 + Math.random() * 4000);
 })();
+
+/* ---------- Égaliseur du parcours : colonnes de carreaux, la colonne en cours danse avec l'effort ---------- */
+// Couleur d'ensemble = intensité actuelle rapportée à tout le parcours (vert → jaune → orange → rouge).
+// Passé plus foncé, à venir plus clair et translucide, moments calmes plus sombres que les pics.
+const eq = { last: 0, b: {}, peak: 0 };
+const rgbOf = c => c.match(/\d+/g).slice(0, 3).map(Number);
+const mixRGB = (a, b, t) => a.map((v, j) => Math.round(v + (b[j] - v) * t));
+function eqBounce(d, now, i, live){
+  const st = eq.b[d] || (eq.b[d] = { v: 0, to: 0, next: 0 });
+  if (now > st.next){ st.to = Math.random() * 2 - 1; st.next = now + 1000 / (4 + 9 * i) * (0.7 + Math.random() * 0.6); }
+  st.v += (st.to - st.v) * 0.3;
+  if (!live || skyCalm.matches) return 0;
+  return st.v * (0.08 + 0.3 * i) * [1, 0.55, 0.3][Math.abs(d)];
+}
+function drawEq(cv, now, iNow, dt){
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  if (!w || !h) return;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)){ cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const segs = progEffective(prog) || prog.p.segments, tot = segs.reduce((a, q) => a + q.d, 0) || 1;
+  const ef = segs.concat(prog.p.segments).map(q => vo2(q.s, q.i)), lo = Math.min(...ef), hi = Math.max(...ef), span = hi - lo > 0.5 ? hi - lo : 0;
+  const relOf = q => span ? Math.min(1, Math.max(0, (vo2(q.s, q.i) - lo) / span)) : effortAbs(q.s, q.i);
+  const relAt = t => { let acc = 0; for (const q of segs){ acc += q.d; if (t < acc) return relOf(q); } return relOf(segs[segs.length - 1]); };
+  const gap = 2, N = Math.max(16, Math.min(64, Math.round(w / 11))), cw = (w - gap * (N - 1)) / N;
+  const ch = h >= 80 ? 5 : 4, R = Math.max(4, Math.floor((h + gap) / (ch + gap)));
+  const cur = Math.min(N - 1, Math.floor(Math.min(prog.t, tot - 1) / tot * N)), live = S.status === 'running';
+  const G = rgbOf(effortColor(iNow)), DARK = [12, 15, 20], LIGHT = [236, 241, 246];
+  for (let c = 0; c < N; c++){
+    const d = c - cur, rel = d === 0 ? iNow : relAt((c + 0.5) / N * tot);
+    let lvl = 0.14 + 0.86 * rel;
+    if (Math.abs(d) <= 2) lvl += eqBounce(d, now, iNow, live);
+    const lit = Math.max(1, Math.min(R, Math.round(lvl * R)));
+    if (d === 0){ eq.peak = Math.max(lit, eq.peak - dt / 1000 * 5); }
+    // Teinte de la colonne : passé foncé, à venir clair, calme plus sombre
+    let col = mixRGB(G, DARK, 0.35 * (1 - rel)), alpha = 1;
+    if (d < 0) col = mixRGB(col, DARK, 0.45);
+    if (d > 0){ col = mixRGB(col, LIGHT, 0.22); alpha = 0.32 + 0.3 * rel; }
+    const x = c * (cw + gap);
+    if (d === 0){ g.shadowColor = `rgb(${G})`; g.shadowBlur = 6 + 12 * iNow; }
+    for (let r = 0; r < R; r++){
+      const y = h - (r + 1) * (ch + gap) + gap;
+      if (r < lit){ const k = mixRGB(col, DARK, 0.28 * (1 - r / R)); g.fillStyle = `rgba(${k},${alpha})`; }
+      else g.fillStyle = 'rgba(255,255,255,.035)';
+      g.fillRect(x, y, cw, ch);
+    }
+    if (d === 0){
+      g.shadowBlur = 0;
+      const pr = Math.min(R - 1, Math.round(eq.peak));
+      if (pr >= lit){ g.fillStyle = `rgba(${mixRGB(G, LIGHT, 0.55)},.95)`; g.fillRect(x, h - (pr + 1) * (ch + gap) + gap, cw, ch); }
+    }
+  }
+}
+(function eqLoop(now){
+  requestAnimationFrame(eqLoop);
+  if (!prog || document.hidden || now - eq.last < 33) return;
+  const dt = Math.min(200, now - eq.last); eq.last = now;
+  const i = effortNow();
+  ['#pbProfile', '#bpProfile'].forEach(sel => { const cv = $(sel); if (cv && cv.offsetParent !== null) drawEq(cv, now, i, dt); });
+})(0);
 
 /* ---------- Horloge (1 s) ---------- */
 setInterval(() => {
