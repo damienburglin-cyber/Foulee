@@ -1,6 +1,6 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#0b0d10;color:#eef2f5}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#10151c;color:#eef2f5}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>Foulée</title>
-<meta name="theme-color" content="#0b0d10">
+<meta name="theme-color" content="#161d26">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%231a2129'/%3E%3Cstop offset='1' stop-color='%230b0d10'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='112' fill='url%28%23g%29'/%3E%3Cg fill='%23c4ff3a' transform='skewX%28-14%29'%3E%3Crect x='188' y='112' width='240' height='40' rx='20'/%3E%3Crect x='268' y='180' width='176' height='40' rx='20' opacity='.7'/%3E%3Crect x='348' y='248' width='112' height='40' rx='20' opacity='.42'/%3E%3C/g%3E%3Cpath d='M104 396 L408 320' stroke='%23c4ff3a' stroke-width='46' stroke-linecap='round'/%3E%3Ccircle cx='108' cy='395' r='11' fill='%230b0d10'/%3E%3Ccircle cx='404' cy='321' r='11' fill='%230b0d10'/%3E%3Cpath d='M168 430 L420 367' stroke='%23ffaa1f' stroke-width='14' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -445,6 +445,18 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(3px)}
 .prow{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .big-prog .zone{font-size:14px}
 @media (prefers-reduced-motion:reduce){.profile.live .flow{opacity:0}}
+/* ===== Fond : anthracite bleuté plutôt que noir uni, deux halos doux et de fines lignes de vitesse ; le halo vert suit l'effort ===== */
+:root{--bg:#10151c}
+body,.big{background:
+  radial-gradient(120vw 70vh at 10% -10%,color-mix(in srgb,var(--effort) 17%,transparent),transparent 65%),
+  radial-gradient(110vw 60vh at 100% 105%,rgba(255,170,31,.12),transparent 65%),
+  repeating-linear-gradient(115deg,rgba(255,255,255,.035) 0 1px,transparent 1px 22px),
+  linear-gradient(180deg,#1b2330 0%,#121820 55%,#0d1117 100%);
+  background-attachment:fixed}
+.console,.ctl,.card,.hlist,.editor{background:linear-gradient(180deg,rgba(30,36,45,.9),rgba(19,23,29,.92))}
+.conn{background:rgba(22,27,34,.88)}
+.ds-tabbar::after{background:#1a2029}
+
 .console.live:has(.state.running)::after{animation-duration:var(--belt-dur)}
 @media (prefers-reduced-motion:reduce){.ds-chart.live .flow{opacity:0}}
 </style>
@@ -1635,7 +1647,7 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '26/11/2026 10:01';
+const APP_VERSION = '26/11/2026 11:21';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 
