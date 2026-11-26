@@ -1726,7 +1726,7 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '26/11/2026 14:33';
+const APP_VERSION = '26/11/2026 15:37';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 const progIncMax = p => Math.max(0, ...p.segments.map(s => s.i));
@@ -1846,6 +1846,8 @@ function renderPresets(){
   $('#speedPresets').innerHTML = sp.map(v => `<button data-ps="${v}">${String(v).replace('.', ',')}<small>km/h</small></button>`).join('');
   $('#incPresets').innerHTML = ip.map(v => `<button data-pi="${v}">${v}<small>%</small></button>`).join('');
 }
+// Allure : temps pour 1 km à la vitesse donnée (min:s), « – » sous 0,5 km/h
+const paceTxt = sp => { if (!(sp > 0.5)) return '–'; const sec = Math.round(3600 / sp); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); };
 function renderBig(){
   const live = ['running', 'paused', 'starting'].includes(S.status);
   $('#btnBig').hidden = !driver || !live || big.open;
@@ -1863,7 +1865,7 @@ function renderBig(){
   $('#bIncReal').textContent = Math.abs(S.incline - S.targetIncline) > incStep() / 2 ? 'tapis ' + frI(S.incline) : '';
   $('#bDist').innerHTML = fr2(shown.distance()) + '<small>km</small>';
   $('#bKcal').textContent = Math.round(shown.kcal()) + ' · ' + Math.round(shown.kcalNet());
-  if (S.speed > 0.5){ const p = 60 / S.speed; $('#bPace').textContent = Math.floor(p) + ':' + String(Math.round(p % 1 * 60) % 60).padStart(2, '0'); } else $('#bPace').textContent = '–';
+  $('#bPace').innerHTML = paceTxt(S.speed) + '<small>/km</small>';
   const go = $('#bStart');
   go.textContent = S.status === 'running' ? 'Pause' : S.status === 'paused' ? 'Reprendre' : 'Départ…';
   go.className = S.status === 'running' ? 'pause' : 'go';
@@ -1896,7 +1898,7 @@ function render(){
   $('#vInc').innerHTML = frI(S.incline) + '<small>%</small>';
   $('#vKcal').innerHTML = Math.round(shown.kcal()) + '<small>kcal</small>';
   $('#vKcalNet').innerHTML = Math.round(shown.kcalNet()) + '<small>kcal</small>';
-  if (S.speed > 0.5){ const p = 60 / S.speed; $('#vPace').innerHTML = Math.floor(p) + ':' + String(Math.round(p % 1 * 60) % 60).padStart(2, '0') + '<small>/km</small>'; } else $('#vPace').innerHTML = '–<small>/km</small>';
+  $('#vPace').innerHTML = paceTxt(S.speed) + '<small>/km</small>';
   $('#vAvg').innerHTML = fr1(el ? di / (el / 3600) : 0) + '<small>km/h</small>';
   $('#vSteps').textContent = S.m.steps ? S.m.steps.toLocaleString('fr-FR') : '–';
   $('#vHr').innerHTML = (S.m.hr || '–') + '<small>bpm</small>';
