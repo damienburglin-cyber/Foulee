@@ -524,6 +524,25 @@ html{scroll-padding-bottom:128px}
 .big .run{position:sticky;bottom:0;z-index:2;margin:0 -14px;padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px));background:#0b0d10}
 /* Animations coupées (réglage ou téléphone) */
 .calm *,.calm *::before,.calm *::after{animation:none!important}
+/* ===== Grand écran en portrait : tout tient sur une hauteur, tailles proportionnelles à l'écran (minimums lisibles) ===== */
+@media (orientation:portrait){
+  .big{gap:clamp(6px,1.1dvh,12px);padding-top:calc(clamp(6px,1dvh,10px) + env(safe-area-inset-top,0px));padding-bottom:0}
+  .big-top .btn{min-height:44px}
+  .big-time{font-size:clamp(30px,5dvh,44px)}
+  .big-prog{padding:clamp(6px,1.2dvh,12px) 12px;gap:clamp(4px,.8dvh,8px)}
+  .big-prog .row h2{font-size:clamp(16px,2.4dvh,20px)}
+  .big-prog .profile{height:clamp(60px,12.5dvh,124px)}
+  .big-next{font-size:clamp(15px,2.3dvh,22px)}
+  .big-ctl{flex:1 1 0;min-height:0;padding:clamp(4px,.8dvh,10px) 12px;gap:2px}
+  .big-lbl{font-size:clamp(13px,1.9dvh,15px)}
+  .big-row button{min-height:clamp(56px,9.5dvh,104px);font-size:clamp(26px,4.2dvh,38px)}
+  .big-val .num{font-size:clamp(46px,8.5dvh,96px)}
+  .big-val small{margin-top:clamp(2px,.5dvh,8px);font-size:clamp(13px,1.9dvh,18px)}
+  .big-metrics div{padding:clamp(4px,.7dvh,8px)}
+  .big-metrics b{font-size:clamp(20px,3.3dvh,32px)}
+  .big .run{padding:clamp(6px,1dvh,12px) 14px calc(clamp(6px,1dvh,12px) + env(safe-area-inset-bottom,0px))}
+  .big .run button{min-height:clamp(56px,8.5dvh,84px);font-size:clamp(20px,3dvh,28px)}
+}
 /* ===== Barre d'onglets plus vive : 0,35 s, courbe douce à léger dépassement (au lieu de 0,75 s avec gros rebond) ===== */
 :root{--ease-tab:cubic-bezier(.3,1.15,.55,1)}
 .ds-tabbar{transition:--nx .35s var(--ease-tab)}
@@ -1805,7 +1824,7 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '26/11/2026 21:00';
+const APP_VERSION = '27/11/2026 16:14';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 const progIncMax = p => Math.max(0, ...p.segments.map(s => s.i));
