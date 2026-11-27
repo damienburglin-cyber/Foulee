@@ -884,11 +884,46 @@ const shown = {
   distance: () => S.m.distance ?? S.loc.distance,
   kcal: () => {
     if (settings.kcal === 'estimate' || S.m.kcal == null || S.mode === 'demo') return S.loc.kcal;
-    if (S.mode === 'fitshow' && settings.kcal === 'machine10') return S.m.kcal / 10;
-    return S.m.kcal;
+    const m = S.mode === 'fitshow' && settings.kcal === 'machine10' ? S.m.kcal / 10 : S.m.kcal;
+    // Le tapis renvoie parfois 0 (ou une valeur sans rapport) : on garde alors l'estimation
+    return kcalImplausible(m, S.loc.kcal) ? S.loc.kcal : m;
   },
+  kcalSrc: () => settings.kcal === 'estimate' || S.m.kcal == null || S.mode === 'demo' || shown.kcal() === S.loc.kcal ? 'estimation' : 'tapis',
   kcalNet: () => netKcal(shown.kcal(), shown.elapsed())
 };
+/* Valeur du tapis jugée fausse : l'estimation dépasse 10 kcal et le tapis en donne moins du quart
+   (un tapis surestime plutôt qu'il ne sous-estime ; 0 kcal après un quart d'heure de marche = compteur muet) */
+function kcalImplausible(machine, est){ const m = Number(machine) || 0; return (m <= 0 && est > 0) || (est >= 10 && m < est / 4); }
+/* Estimation d'une séance enregistrée, à partir du relevé (toutes les 10 s : [t, km/h, %, pouls, étape]) ou des moyennes */
+function sessKcalEst(s){
+  const sm = Array.isArray(s.samples) ? s.samples.filter(x => Array.isArray(x) && x[0] >= 0) : [];
+  const dur = Number(s.duration) || 0;
+  if (sm.length >= 2){
+    let k = 0, covered = 0;
+    for (let i = 0; i < sm.length; i++){
+      const next = i + 1 < sm.length ? sm[i + 1][0] : dur;
+      const dt = Math.max(0, Math.min(30, (next || 0) - sm[i][0])); // trou de relevé : au plus 30 s comptées par point
+      k += kcalPerMin(Number(sm[i][1]) || 0, Number(sm[i][2]) || 0) * dt / 60; covered += dt;
+    }
+    if (covered > 0 && covered < dur) k *= dur / covered;
+    return k;
+  }
+  const spd = Number(s.avgSpeed) || (dur ? (Number(s.distance) || 0) / (dur / 3600) : 0);
+  return kcalPerMin(spd, Number(s.avgIncline) || 0) * dur / 60;
+}
+/* Réparation : séances enregistrées avec des calories à 0 (ou sans rapport) parce que le tapis ne les comptait pas */
+function repairSessionKcal(){
+  const h = store.get('sessions', []); let n = 0;
+  h.forEach(s => {
+    if (!s || s.example || s.source === 'demo' || s.kcalSrc === 'estimation' || !(s.duration >= 60) || !(s.distance > 0)) return;
+    const est = sessKcalEst(s);
+    if (!kcalImplausible(s.kcal, est)) return;
+    s.kcalTapis = s.kcal ?? null; s.kcal = Math.round(est * 10) / 10; s.kcalNet = netKcal(s.kcal, s.duration); s.kcalSrc = 'estimation'; n++;
+  });
+  if (n) store.set('sessions', h);
+  return n;
+}
+const kcalRepaired = repairSessionKcal();
 
 /* ---------- Pilote FitShow (service FFF0) ---------- */
 function FitShowDriver(server, svc, wr, nt){
@@ -1092,7 +1127,7 @@ async function diag(){
   // Navigateur intégré de l'appli Claude ou Chrome : les données sont-elles les mêmes ?
   let mark = null; try { mark = localStorage.getItem('foulee.storeMark'); if (!mark){ mark = 'créé le ' + new Date().toLocaleString('fr-FR'); localStorage.setItem('foulee.storeMark', mark); } } catch(e){ mark = 'stockage inaccessible'; }
   try {
-  log('', 'Diag · stockage : ' + store.get('sessions', []).filter(x => !x.example).length + ' séances, ' + programs.length + ' programmes, repère ' + mark + ' · ouvert depuis : ' + (document.referrer ? new URL(document.referrer).host : 'aucune page') + (window.matchMedia && matchMedia('(display-mode: standalone)').matches ? ' · appli installée' : ' · onglet') + ' · version ' + APP_VERSION);
+  log('', 'Diag · stockage : ' + store.get('sessions', []).filter(x => !x.example).length + ' séances, ' + programs.length + ' programmes, repère ' + mark + ' · ouvert depuis : ' + (document.referrer ? new URL(document.referrer).host : 'aucune page') + (window.matchMedia && matchMedia('(display-mode: standalone)').matches ? ' · appli installée' : ' · onglet') + ' · version ' + APP_VERSION + (kcalRepaired ? ' · calories recalculées sur ' + kcalRepaired + ' séance(s) où le tapis donnait 0' : ''));
   } catch(e){ log('err', 'Diag · stockage : ' + e.message); }
 }
 
@@ -1372,7 +1407,7 @@ function finishSession(){
       const bootS = session.samples.findIndex(x => x[4] >= 0);
       log('', 'Bilan programme : ' + done + '/' + session.plan.length + ' étapes faites' + (prog && prog.t >= progDur(prog.p) - 1 ? ', programme terminé' : ', arrêté avant la fin') + ' · secondes par étape ' + per.join('/') + ' (prévu ' + session.plan.map(x => x.d).join('/') + ')' + (bootS > 0 ? ' · mise en vitesse ' + bootS + ' s' : '') + ' · ' + (session.adjust || []).length + ' réglage(s) manuel(s)');
     }
-    const s = { id: session.id, start: session.start, end: Date.now(), program: session.program, duration: el, distance: shown.distance(), kcal: shown.kcal(), kcalNet: shown.kcalNet(),
+    const s = { id: session.id, start: session.start, end: Date.now(), program: session.program, duration: el, distance: shown.distance(), kcal: shown.kcal(), kcalNet: shown.kcalNet(), kcalSrc: shown.kcalSrc(), kcalTapis: S.m.kcal,
       pid: session.pid || null, plan: session.plan || null, adjust: session.adjust || [],
       maxSpeed: st.maxSpeed, avgIncline: st.avgIncline, maxIncline: st.maxIncline, elevation: st.elevation,
       steps: S.m.steps || null, hrAvg: st.hrAvg, hrMax: st.hrMax, source: S.mode,
@@ -1589,7 +1624,7 @@ function showSummary(s, justEnded){
     ['Durée', hms(s.duration)], ['Distance', fr2(s.distance) + ' km'],
     ['Vitesse moyenne', fr1(s.avgSpeed) + ' km/h'], ['Vitesse max', g('maxSpeed') != null ? fr1(g('maxSpeed')) + ' km/h' : null],
     ['Pente moyenne', inc(g('avgIncline'))], ['Pente max', g('maxIncline') != null ? Math.round(g('maxIncline')) + ' %' : null],
-    ['Dénivelé positif', g('elevation') != null ? Math.round(g('elevation')) + ' m' : null], ['Calories brutes', Math.round(s.kcal) + ' kcal'], ['Calories nettes', Math.round(sessNet(s)) + ' kcal']
+    ['Dénivelé positif', g('elevation') != null ? Math.round(g('elevation')) + ' m' : null], ['Calories brutes', Math.round(s.kcal) + ' kcal' + (s.kcalSrc === 'estimation' ? ' (estimées)' : '')], ['Calories nettes', Math.round(sessNet(s)) + ' kcal']
   ];
   const more = [
     ['Allure moyenne', pace], ['Pas', s.steps ? s.steps.toLocaleString('fr-FR') : null],
@@ -1824,7 +1859,7 @@ function syncPrograms(){
   toast(before === programs.map(p => p.name).join('|') ? 'Programmes déjà à jour' : 'Programmes synchronisés : ' + official.length + ' Foulée' + (own.length ? ' + ' + own.length + ' à toi' : ''));
 }
 // Version affichée dans Réglages : permet de voir si le téléphone a bien chargé la dernière mise à jour
-const APP_VERSION = '27/11/2026 16:14';
+const APP_VERSION = '27/11/2026 23:30';
 const progDur = p => p.segments.reduce((a, s) => a + s.d, 0);
 const progDist = p => p.segments.reduce((a, s) => a + s.s * s.d / 3600, 0);
 const progIncMax = p => Math.max(0, ...p.segments.map(s => s.i));
@@ -2481,7 +2516,7 @@ $('#fileImport').addEventListener('change', async e => {
   // Séances : ajout de celles qui manquent (même id = même séance), les exemples en moins
   const h = store.get('sessions', []), have = new Set(h.map(x => x.id));
   const newS = d.sessions.filter(x => x && x.id && !have.has(x.id) && !x.example);
-  h.push(...newS); h.sort((a, z) => z.start - a.start); store.set('sessions', h.slice(0, 200));
+  h.push(...newS); h.sort((a, z) => z.start - a.start); store.set('sessions', h.slice(0, 200)); repairSessionKcal();
   // Programmes : ajout de ceux qui manquent ; un programme du même id mais modifié arrive en copie
   let newP = 0;
   d.programs.forEach(x => {
